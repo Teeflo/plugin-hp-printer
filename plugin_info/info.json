@@ -7,8 +7,8 @@
 		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS)."
 	},
 	"licence": "AGPL",
-	"author": "Jeedom SAS",
-	"require": "4.2",
+	"author": "Teeflo",
+	"require": "4.1",
 	"category": "communication",
 	"hasDependency": false,
 	"hasOwnDeamon": false,
