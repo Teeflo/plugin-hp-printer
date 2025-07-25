@@ -38,10 +38,8 @@ class hp_printer extends eqLogic {
   public static function cron() {
     foreach (eqLogic::byType('hp_printer') as $hp_printer) {
       $cron = $hp_printer->getConfiguration('refresh_cron');
-      if (!empty($cron) && cron::isCronValid($cron)) {
-        if (cron::checkCron($cron)) {
-          $hp_printer->pull();
-        }
+      if (!empty($cron)) {
+        $hp_printer->pull();
       }
     }
   }
@@ -123,6 +121,7 @@ class hp_printer extends eqLogic {
   */
 
   public function pull() {
+    log::add('hp_printer', 'debug', 'Starting pull() for equipment: ' . $this->getName());
     $ip_address = $this->getConfiguration('ip_address');
     if (empty($ip_address)) {
       log::add('hp_printer', 'error', 'Adresse IP de l\'imprimante non configurée pour l\'équipement ' . $this->getName());
@@ -131,15 +130,18 @@ class hp_printer extends eqLogic {
 
     // The URL to fetch. This might vary between HP printer models.
     // A common path for supplies information is /hp/device/info_supplies.html or /info_supplies.html
-    // You might need to investigate the specific printer's EWS to find the correct URL.
+    // You might need to investigate the specific printer\'s EWS to find the correct URL.
     $url = "http://" . $ip_address . "/hp/device/info_supplies.html";
-    log::add('hp_printer', 'debug', 'Fetching data from: ' . $url);
+    log::add('hp_printer', 'debug', 'Fetching data from URL: ' . $url);
 
     try {
       $html = file_get_contents($url);
       if ($html === false) {
         throw new Exception('Failed to fetch HTML from ' . $url);
       }
+      log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $url . '. HTML length: ' . strlen($html));
+      // Optionally, log a truncated version of the HTML for debugging if needed
+      // log::add('hp_printer', 'debug', 'HTML content (truncated): ' . substr($html, 0, 500) . '...');
 
       $dom = new DOMDocument();
       // Suppress warnings for malformed HTML, which is common in embedded web servers
@@ -149,82 +151,114 @@ class hp_printer extends eqLogic {
       $xpath = new DOMXPath($dom);
 
       // --- Extracting Printer Status ---
-      // This XPath is a placeholder. You will need to inspect the actual HTML of your printer's EWS
-      // to find the correct XPath or CSS selector for the printer status.
-      // Common patterns: elements with specific IDs, classes, or text content.
-      // Example: <span id="hp-printer-status">Ready</span>
       $nodes = $xpath->query("//span[@id='hp-printer-status'] | //div[contains(text(), 'Status:')]/following-sibling::span");
       if ($nodes->length > 0) {
         $printerStatus = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'printer_status')->execCmd($printerStatus);
+        $cmd = $this->getCmd(null, 'printer_status');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'printer_status', 'Statut Imprimante', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: printer_status');
+        }
+        $cmd->execCmd($printerStatus);
         log::add('hp_printer', 'debug', 'Printer Status: ' . $printerStatus);
       } else {
         log::add('hp_printer', 'warning', 'Could not find printer status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Page Count ---
-      // Example: <span id="TotalPagesPrinted">12345</span> or <td class="label">Total Pages:</td><td class="value">12345</td>
       $nodes = $xpath->query("//span[@id='TotalPagesPrinted'] | //td[contains(text(), 'Total Pages:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $pageCount = (int)trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'page_count')->execCmd($pageCount);
+        $cmd = $this->getCmd(null, 'page_count');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'page_count', 'Compteur Pages', 'numeric');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: page_count');
+        }
+        $cmd->execCmd($pageCount);
         log::add('hp_printer', 'debug', 'Page Count: ' . $pageCount);
       } else {
         log::add('hp_printer', 'warning', 'Could not find page count for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Printer Model ---
-      // Example: <span id="ProductName">HP LaserJet Pro MFP M1234</span> or <td class="label">Model Name:</td><td class="value">HP LaserJet Pro MFP M1234</td>
       $nodes = $xpath->query("//span[@id='ProductName'] | //td[contains(text(), 'Model Name:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $printerModel = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'printer_model')->execCmd($printerModel);
+        $cmd = $this->getCmd(null, 'printer_model');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'printer_model', 'Modèle Imprimante', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: printer_model');
+        }
+        $cmd->execCmd($printerModel);
         log::add('hp_printer', 'debug', 'Printer Model: ' . $printerModel);
       } else {
         log::add('hp_printer', 'warning', 'Could not find printer model for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Serial Number ---
-      // Example: <span id="SerialNumber">ABC123DEF456</span> or <td class="label">Serial Number:</td><td class="value">ABC123DEF456</td>
       $nodes = $xpath->query("//span[@id='SerialNumber'] | //td[contains(text(), 'Serial Number:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $serialNumber = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'serial_number')->execCmd($serialNumber);
+        $cmd = $this->getCmd(null, 'serial_number');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'serial_number', 'Numéro Série', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: serial_number');
+        }
+        $cmd->execCmd($serialNumber);
         log::add('hp_printer', 'debug', 'Serial Number: ' . $serialNumber);
       } else {
         log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting MAC Address ---
-      // Example: <span id="MACAddress">00:11:22:33:44:55</span> or <td class="label">MAC Address:</td><td class="value">00:11:22:33:44:55</td>
       $nodes = $xpath->query("//span[@id='MACAddress'] | //td[contains(text(), 'MAC Address:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $macAddress = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'mac_address')->execCmd($macAddress);
+        $cmd = $this->getCmd(null, 'mac_address');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'mac_address', 'Adresse MAC', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: mac_address');
+        }
+        $cmd->execCmd($macAddress);
         log::add('hp_printer', 'debug', 'MAC Address: ' . $macAddress);
       } else {
         log::add('hp_printer', 'warning', 'Could not find MAC address for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Paper Tray Status ---
-      // Example: <span id="PaperTrayStatus">OK</span> or <div class="tray-status">Empty</div>
       $nodes = $xpath->query("//span[@id='PaperTrayStatus'] | //div[contains(@class, 'tray-status')] | //td[contains(text(), 'Paper Tray:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $paperTrayStatus = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'paper_tray_status')->execCmd($paperTrayStatus);
+        $cmd = $this->getCmd(null, 'paper_tray_status');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'paper_tray_status', 'Statut Bac Papier', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: paper_tray_status');
+        }
+        $cmd->execCmd($paperTrayStatus);
         log::add('hp_printer', 'debug', 'Paper Tray Status: ' . $paperTrayStatus);
       } else {
         log::add('hp_printer', 'warning', 'Could not find paper tray status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Error Messages ---
-      // Example: <div class="error-message">Paper Jam</div> or <ul><li>Error: Out of paper</li></ul>
       $nodes = $xpath->query("//div[contains(@class, 'error-message')] | //ul[@class='error-list']/li");
       $errorMessages = [];
       foreach ($nodes as $node) {
         $errorMessages[] = trim($node->nodeValue);
       }
-      $this->getCmd(null, 'error_messages')->execCmd(implode(', ', $errorMessages));
+      $cmd = $this->getCmd(null, 'error_messages');
+      if (!is_object($cmd)) {
+          $cmd = $this->addCmd('info', 'error_messages', 'Messages Erreur', 'string');
+          $cmd->save();
+          log::add('hp_printer', 'debug', 'Created new command: error_messages');
+      }
+      $cmd->execCmd(implode(', ', $errorMessages));
       if (!empty($errorMessages)) {
         log::add('hp_printer', 'debug', 'Error Messages: ' . implode(', ', $errorMessages));
       } else {
@@ -233,24 +267,24 @@ class hp_printer extends eqLogic {
 
 
       // --- Extracting Network Status ---
-      // Example: <span id="NetworkStatus">Connected (Wi-Fi)</span> or <td class="label">Network Status:</td><td class="value">Connected (Ethernet)</td>
       $nodes = $xpath->query("//span[@id='NetworkStatus'] | //td[contains(text(), 'Network Status:')]/following-sibling::td");
       if ($nodes->length > 0) {
         $networkStatus = trim($nodes->item(0)->nodeValue);
-        $this->getCmd(null, 'network_status')->execCmd($networkStatus);
+        $cmd = $this->getCmd(null, 'network_status');
+        if (!is_object($cmd)) {
+            $cmd = $this->addCmd('info', 'network_status', 'Statut Réseau', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: network_status');
+        }
+        $cmd->execCmd($networkStatus);
         log::add('hp_printer', 'debug', 'Network Status: ' . $networkStatus);
       } else {
         log::add('hp_printer', 'warning', 'Could not find network status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
       }
 
       // --- Extracting Ink Levels (dynamic creation and update) ---
-      // This is highly dependent on the HTML structure. HP EWS pages vary significantly.
-      // Common patterns: tables with ink cartridge information, divs with data attributes.
-      // Example 1 (table): <tr><td>Black</td><td><div class="ink-level-bar" style="width: 80%;"></div></td><td>80%</td></tr>
-      // Example 2 (div with data attributes): <div class="ink-cartridge" data-color="black" data-level="75">
-      // Example 3 (more generic, looking for common ink color names and percentages):
-      //   <span class="ink-color">Black</span>: <span class="ink-percentage">80%</span>
       $inkNodes = $xpath->query("//table[@id='ink_levels_table']//tr | //div[contains(@class, 'ink-cartridge')] | //*[contains(@class, 'ink-color')]");
+      log::add('hp_printer', 'debug', 'Found ' . $inkNodes->length . ' potential ink level nodes.');
 
       foreach ($inkNodes as $node) {
         $color = '';
@@ -290,9 +324,12 @@ class hp_printer extends eqLogic {
           if (!is_object($cmd)) {
             $cmd = $this->addCmd('info', $cmdName, $humanName, 'numeric', '%');
             $cmd->save(); // Save the new command
+            log::add('hp_printer', 'debug', 'Created new command: ' . $cmdName);
           }
           $cmd->execCmd((int)$level);
           log::add('hp_printer', 'debug', 'Ink Level - ' . $humanName . ': ' . $level . '%');
+        } else {
+            log::add('hp_printer', 'debug', 'Skipping ink node due to empty color or level. Color: "' . $color . '", Level: "' . $level . '"');
         }
       }
 
