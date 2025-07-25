@@ -1,0 +1,44 @@
+{
+	"id": "hp_printer",
+	"name": "HP Printer",
+	"pluginVersion": "0.1",
+	"icon": "hp_printer_icon.png",
+	"description": {
+		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS)."
+	},
+	"licence": "AGPL",
+	"author": "Jeedom SAS",
+	"require": "4.2",
+	"category": "communication",
+	"hasDependency": false,
+	"hasOwnDeamon": false,
+	"maxDependancyInstallTime": 0,
+	"changelog_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/beta\/changelog",
+	"changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/changelog",
+	"documentation_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/beta",
+	"documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer",
+	"link": {
+		"forum": "Lien vers le forum",
+		"video": "Lien vers une video"
+	},
+	"language": [
+		"fr_FR",
+		"en_US",
+		"es_ES",
+		"de_DE",
+		"ru_RU",
+		"id_ID",
+		"it_IT",
+		"ja_JP",
+		"pt_PT"
+	],
+	"compatibility": [
+		"smart",
+		"luna",
+		"atlas",
+		"rpi",
+		"docker",
+		"diy",
+		"mobile"
+	]
+}
