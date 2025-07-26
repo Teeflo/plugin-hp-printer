@@ -49,7 +49,7 @@ $('#bt_testHpPrinter').on('click', function(){
     dataType: 'json',
     error: function (request, status, error) {
       console.error('Erreur AJAX:', request.responseText);
-      $('#div_alert').showAlert({message: '{{Erreur lors du test de connexion}} : ' + request.responseText, level: 'danger'});
+            $('#div_alert').showAlert({message: '{{Erreur lors du test de connexion}}', level: 'danger'});
     },
     success: function (data) {
       if (data.state != 'ok') {

@@ -163,16 +163,11 @@ class hp_printer extends eqLogic {
     foreach ($commands as $logical => $info) {
         $cmd = $this->getCmd(null, $logical);
         if (!is_object($cmd)) {
-            $cmd = new hp_printerCmd();
-            $cmd->setLogicalId($logical);
-            $cmd->setEqLogic_id($this->getId());
+            $cmd = parent::addCmd($info['type'], $logical, $info['name'], $info['subType']);
+            $cmd->setIsVisible(1);
+            $cmd->setIsHistorized(1);
+            $cmd->save();
         }
-        $cmd->setType($info['type']);
-        $cmd->setSubType($info['subType']);
-        $cmd->setName($info['name']);
-        $cmd->setIsVisible(1);
-        $cmd->setIsHistorized(1);
-        $cmd->save();
     }
 
     // Handle ink levels dynamically
@@ -193,37 +188,12 @@ class hp_printer extends eqLogic {
         }
 
         if ($html_result !== false) {
-            $dom = new DOMDocument();
-            libxml_use_internal_errors(true);
-            $dom->loadHTML($html_result['html']);
-            libxml_clear_errors();
-            $xpath = new DOMXPath($dom);
+            $html = $html_result['html'];
+            if (preg_match_all('/(\d+) userReplaceable .*? (CMY|K)TriDots/', $html, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $match) {
+                    $level = $match[1];
+                    $color = ($match[2] == 'CMY') ? 'color' : 'black';
 
-            $inkNodes = $xpath->query("//table[@id='ink_levels_table']//tr | //div[contains(@class, 'ink-cartridge')] | //*[contains(@class, 'ink-color')]");
-            foreach ($inkNodes as $node) {
-                $color = '';
-                $level = '';
-
-                if ($node->nodeName === 'tr') {
-                    $tds = $node->getElementsByTagName('td');
-                    if ($tds->length >= 3) {
-                        $color = trim($tds->item(0)->nodeValue);
-                        if (preg_match('/(\d+)%/', $tds->item(2)->nodeValue, $matches)) {
-                            $level = $matches[1];
-                        }
-                    }
-                } else if ($node->nodeName === 'div' && $node->hasAttribute('data-color') && $node->hasAttribute('data-level')) {
-                    $color = $node->getAttribute('data-color');
-                    $level = $node->getAttribute('data-level');
-                } else if (strpos($node->getAttribute('class'), 'ink-color') !== false) {
-                    $color = trim($node->nodeValue);
-                    $percentageNode = $xpath->query("following-sibling::*[contains(@class, 'ink-percentage')]", $node);
-                    if ($percentageNode->length > 0 && preg_match('/(\d+)%/', $percentageNode->item(0)->nodeValue, $matches)) {
-                        $level = $matches[1];
-                    }
-                }
-
-                if (!empty($color) && !empty($level)) {
                     $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
                     $cmdName = 'ink_level_' . $logicalIdColor;
                     $humanName = 'Niveau Encre ' . ucfirst($color);
@@ -233,6 +203,7 @@ class hp_printer extends eqLogic {
                         $cmd = parent::addCmd('info', $cmdName, $humanName, 'numeric', '%');
                         $cmd->save();
                     }
+                    $cmd->execCmd((int)$level);
                 }
             }
         }
@@ -365,9 +336,22 @@ class hp_printer extends eqLogic {
         log::add('hp_printer', 'warning', 'Could not find printer model for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
       }
 
-      // --- Extracting Serial Number (not found in provided samples, leaving as is for now) ---
-      // $serialNumber = ''; // No clear pattern in provided text
-      // log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. No clear pattern in provided text.');
+      // --- Extracting Serial Number from ProductConfigDyn.xml ---
+      $productConfigDynUrl = "http://" . $ip_address . "/DevMgmt/ProductConfigDyn.xml";
+      $productConfigDynHtml = $this->fetchHtml($productConfigDynUrl)['html'];
+      if ($productConfigDynHtml !== false && preg_match('/([A-Z0-9]{10,})/', $productConfigDynHtml, $matches)) {
+        $serialNumber = trim($matches[1]);
+        $cmd = $this->getCmd(null, 'serial_number');
+        if (!is_object($cmd)) {
+            $cmd = parent::addCmd('info', 'serial_number', 'Numéro Série', 'string');
+            $cmd->save();
+            log::add('hp_printer', 'debug', 'Created new command: serial_number');
+        }
+        $cmd->execCmd($serialNumber);
+        log::add('hp_printer', 'debug', 'Serial Number: ' . $serialNumber);
+      } else {
+        log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. Please check ProductConfigDyn.xml content.');
+      }
 
       // --- Extracting MAC Address from NetAppsDyn.xml ---
       if ($netAppsDynHtml !== false && preg_match('/HP([0-9A-F]{12})\.local\./', $netAppsDynHtml, $matches)) {
@@ -393,7 +377,7 @@ class hp_printer extends eqLogic {
       // log::add('hp_printer', 'warning', 'Could not find error messages for ' . $this->getName() . '. No clear pattern in provided text.');
 
       // --- Extracting Network Status from NetAppsDyn.xml ---
-      if ($netAppsDynHtml !== false && preg_match('/IPP (enabled|disabled)/', $netAppsDynHtml, $matches)) {
+      if ($netAppsDynHtml !== false && preg_match('/IPP\s(enabled|disabled)/', $netAppsDynHtml, $matches)) {
         $networkStatus = trim($matches[1]);
         $cmd = $this->getCmd(null, 'network_status');
         if (!is_object($cmd)) {
@@ -438,9 +422,6 @@ class hp_printer extends eqLogic {
       }
 
       log::add('hp_printer', 'info', 'Data pulled successfully for ' . $this->getName());
-
-    
-      
   }
 
   /*     * **********************Getteur Setteur*************************** */
