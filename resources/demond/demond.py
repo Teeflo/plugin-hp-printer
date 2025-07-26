@@ -22,10 +22,13 @@ import signal
 import json
 import argparse
 
-from jeedom.jeedom import jeedom_socket, jeedom_utils, jeedom_com, JEEDOM_SOCKET_MESSAGE  # jeedom_serial
+from jeedom.jeedom import jeedom_socket, jeedom_utils, jeedom_com
 
 
 def read_socket():
+    # This daemon does not actively process socket messages for printer data.
+    # Printer data is pulled via HTTP requests in the PHP class.
+    # This function is a placeholder for potential future socket-based commands.
     if not JEEDOM_SOCKET_MESSAGE.empty():
         logging.debug("Message received in socket JEEDOM_SOCKET_MESSAGE")
         message = json.loads(jeedom_utils.stripped(JEEDOM_SOCKET_MESSAGE.get()))
@@ -33,7 +36,7 @@ def read_socket():
             logging.error("Invalid apikey from socket: %s", message)
             return
         try:
-            print('read')
+            logging.debug('Socket message received, but no action defined for this plugin.')
         except Exception as e:
             logging.error('Send command to demon error: %s', e)
 
@@ -64,10 +67,7 @@ def shutdown():
         my_jeedom_socket.close()
     except Exception as e:
         logging.warning('Error closing socket: %s', e)
-    # try:  # if you need jeedom_serial
-    #     my_jeedom_serial.close()
-    # except Exception as e:
-    #     logging.warning('Error closing serial: %s', e)
+    
     logging.debug("Exit 0")
     sys.stdout.flush()
     os._exit(0)

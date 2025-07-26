@@ -1,454 +1,480 @@
 <?php
-/* This file is part of Jeedom.
-*
-* Jeedom is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* Jeedom is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
-*/
+/**
+ * Class hp_printer
+ *
+ * This class handles communication with HP printers to retrieve various status and configuration data.
+ */
+class hp_printer {
 
-/* * ***************************Includes********************************* */
-require_once __DIR__  . '/../../../../core/php/core.inc.php';
+    private $ipAddress; // The IP address of the HP printer
 
-class hp_printer extends eqLogic {
-  /*     * *************************Attributs****************************** */
-
-  /*
-  * Permet de définir les possibilités de personnalisation du widget (en cas d'utilisation de la fonction 'toHtml' par exemple)
-  * Tableau multidimensionnel - exemple: array('custom' => true, 'custom::layout' => false)
-  public static $_widgetPossibility = array();
-  */
-
-  /*
-  * Permet de crypter/décrypter automatiquement des champs de configuration du plugin
-  * Exemple : "param1" & "param2" seront cryptés mais pas "param3"
-  public static $_encryptConfigKey = array('param1', 'param2');
-  */
-
-  /*     * ***********************Methode static*************************** */
-
-  public static function cron() {
-    foreach (eqLogic::byType('hp_printer') as $hp_printer) {
-      $cron = $hp_printer->getConfiguration('refresh_cron');
-      if (!empty($cron)) {
-        $hp_printer->pull();
-      }
-    }
-  }
-
-  public static function cron5() {
-    // This cron is not used as we have a configurable cron
-  }
-  
-  public static function deamon_start() {
-    $deamon_info = self::deamon_info();
-    if ($deamon_info['state'] == 'ok') {
-      return;
-    }
-    log::add('hp_printer', 'info', 'Lancement du démon');
-    $path = realpath(dirname(__FILE__) . '/../resources/demond/demond.py');
-    $cmd = 'python3 ' . $path . ' --loglevel ' . log::getLogLevel('hp_printer') . ' --callback ' . network::getCallbackUrl() . ' --apikey ' . jeedom::getApiKey('hp_printer') . ' --pid ' . jeedom::getTmpFolder('hp_printer') . '/demond.pid';
-    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
-    if (is_object($cron)) {
-      $cron->stop();
-      $cron->remove();
-    }
-    $cron = new cron();
-    $cron->setClass('hp_printer');
-    $cron->setFunction('deamon_start');
-    $cron->setEnable(1);
-    $cron->setDeamon(1);
-    $cron->setSchedule('* * * * *');
-    $cron->setTimeout('15');
-    $cron->setCmd($cmd);
-    $cron->save();
-    $cron->start();
-  }
-
-  public static function deamon_stop() {
-    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
-    if (is_object($cron)) {
-      $cron->stop();
-      $cron->remove();
-    }
-    log::add('hp_printer', 'info', 'Arrêt du démon');
-  }
-
-  public static function deamon_info() {
-    $return = array('launchable' => 'nok', 'state' => 'nok', 'log' => 'nok', 'auto' => 0);
-    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
-    if (is_object($cron)) {
-      $return['launchable'] = 'ok';
-      $return['state'] = $cron->getState();
-      $return['log'] = $cron->getLog();
-      $return['auto'] = $cron->getAuto();
-    }
-    return $return;
-  }
-  
-  /*
-  * Permet de déclencher une action avant modification d'une variable de configuration du plugin
-  * Exemple avec la variable "param3"
-  public static function preConfig_param3( $value ) {
-    // do some checks or modify on $value
-    return $value;
-  }
-  */
-
-  /*
-  * Permet de déclencher une action après modification d'une variable de configuration du plugin
-  * Exemple avec la variable "param3"
-  public static function postConfig_param3($value) {
-    // no return value
-  }
-  */
-
-  /*
-   * Permet d'indiquer des éléments supplémentaires à remonter dans les informations de configuration
-   * lors de la création semi-automatique d'un post sur le forum community
-   public static function getConfigForCommunity() {
-      // Cette function doit retourner des infos complémentataires sous la forme d'un
-      // string contenant les infos formatées en HTML.
-      return "les infos essentiel de mon plugin";
-   }
-   */
-
-  /*     * *********************Méthodes d'instance************************* */
-
-  // Fonction exécutée automatiquement avant la création de l'équipement
-  public function preInsert() {
-  }
-
-  // Fonction exécutée automatiquement après la création de l'équipement
-  public function postInsert() {
-  }
-
-  // Fonction exécutée automatiquement avant la mise à jour de l'équipement
-  public function preUpdate() {
-  }
-
-  // Fonction exécutée automatiquement après la mise à jour de l'équipement
-  public function postUpdate() {
-  }
-
-  // Fonction exécutée automatiquement avant la sauvegarde (création ou mise à jour) de l'équipement
-  public function preSave() {
-  }
-
-  public function postSave() {
-    // Ne créer les commandes que si l'équipement a un ID valide et qu'il n'y a pas déjà de commandes
-    if ($this->getId() == '') {
-        return;
+    /**
+     * Constructor
+     *
+     * @param string $ipAddress The IP address of the HP printer.
+     */
+    public function __construct($ipAddress) {
+        $this->ipAddress = $ipAddress;
     }
 
-    $commands = [
-        'printer_status' => ['name' => __('Statut Imprimante', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'page_count' => ['name' => __('Compteur Pages', __FILE__), 'type' => 'info', 'subType' => 'numeric'],
-        'printer_model' => ['name' => __('Modèle Imprimante', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'serial_number' => ['name' => __('Numéro Série', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'mac_address' => ['name' => __('Adresse MAC', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'paper_tray_status' => ['name' => __('Statut Bac Papier', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'error_messages' => ['name' => __('Messages Erreur', __FILE__), 'type' => 'info', 'subType' => 'string'],
-        'network_status' => ['name' => __('Statut Réseau', __FILE__), 'type' => 'info', 'subType' => 'string'],
-    ];
+    /**
+     * Fetches XML content from the printer using cURL and parses it into a SimpleXMLElement object.
+     *
+     * @param string $path The path to the XML endpoint (e.g., '/DevMgmt/ProductConfigDyn.xml').
+     * @return SimpleXMLElement|false Returns a SimpleXMLElement object on success, or false on failure.
+     */
+    private function _fetchXml($path) {
+        $url = "http://" . $this->ipAddress . $path;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 seconds timeout
 
-    foreach ($commands as $logical => $info) {
-        $cmd = $this->getCmd(null, $logical);
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd($info['type'], $logical, $info['name'], $info['subType']);
-            $cmd->setIsVisible(1);
-            $cmd->setIsHistorized(1);
-            $cmd->save();
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || $response === false) {
+            log::error("HP Printer Plugin: Failed to fetch XML from {$url}. HTTP Code: {$httpCode}, Error: {$error}");
+            return false;
         }
+
+        // Suppress XML parsing errors to handle malformed XML gracefully
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($response);
+        if ($xml === false) {
+            $errors = [];
+            foreach (libxml_get_errors() as $error) {
+                $errors[] = $error->message;
+            }
+            libxml_clear_errors();
+            log::error("HP Printer Plugin: Failed to parse XML from {$url}. Errors: " . implode(", ", $errors));
+            // Return an empty SimpleXMLElement to prevent errors in subsequent XPath queries
+            return new SimpleXMLElement('<root/>');
+        }
+        return $xml;
     }
 
-    // Handle ink levels dynamically
-    $ip_address = $this->getConfiguration('ip_address');
-    if (!empty($ip_address)) {
-        $urls_to_try = [
-            "http://" . $ip_address . "/ProductConfigDyn.xml",
-            "http://" . $ip_address . "/ConsumableConfigDyn.xml"
-        ];
+    /**
+     * Retrieves consumable information from the printer.
+     *
+     * @return array An associative array of consumable data.
+     */
+    public function getConsumableInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/ConsumableConfigDyn.xml');
+        if ($xml) {
+            // Register namespaces for XPath queries
+            $xml->registerXPathNamespace('ccdyn', 'http://www.hp.com/schemas/imaging/con/ledm/consumableconfigdyn/2007/11/19');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+            $xml->registerXPathNamespace('dd2', 'http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10');
 
-        $html_result = false;
-        foreach ($urls_to_try as $url) {
-            $result = $this->fetchHtml($url);
-            if ($result['html'] !== false) {
-                $html_result = $result;
-                break;
+            $result = $xml->xpath('//dd:NumOfUserReplaceableConsumables');
+            $data['numOfUserReplaceableConsumables'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:NumOfNonUserReplaceableConsumables');
+            $data['numOfNonUserReplaceableConsumables'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:AlignmentMode');
+            $data['alignmentMode'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ccdyn:SingleCartridgeMode');
+            $data['singleCartridgeMode'] = (isset($result[0])) ? (string)$result[0] : '';
+
+            $consumables = $xml->xpath('//ccdyn:ConsumableInfo');
+            foreach ($consumables as $index => $consumable) {
+                $result = $consumable->xpath('./dd:ConsumablePercentageLevelRemaining');
+                $data['consumable_' . ($index + 1) . '_percentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd:ConsumableSelectibilityNumber');
+                $data['consumable_' . ($index + 1) . '_selectibilityNumber'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd:ConsumableLifeState/dd:ConsumableState');
+                $data['consumable_' . ($index + 1) . '_lifeState'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd:MarkerColor');
+                $data['consumable_' . ($index + 1) . '_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd2:CumulativeConsumableCount');
+                $data['consumable_' . ($index + 1) . '_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd2:CumulativeMarkingAgentUsed/dd:Unit');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
+                $result = $consumable->xpath('./dd:ConsumableRawPercentageLevelRemaining');
+                $data['consumable_' . ($index + 1) . '_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
             }
         }
+        return $data;
+    }
 
-        if ($html_result !== false) {
-            $html = $html_result['html'];
-            if (preg_match_all('/(\d+) userReplaceable .*? (CMY|K)TriDots/', $html, $matches, PREG_SET_ORDER)) {
-                foreach ($matches as $match) {
-                    $level = $match[1];
-                    $color = ($match[2] == 'CMY') ? 'color' : 'black';
+    /**
+     * Retrieves network application information from the printer.
+     *
+     * @return array An associative array of network application data.
+     */
+    public function getNetworkAppInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/NetAppsDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('nadyn', 'http://www.hp.com/schemas/imaging/con/ledm/netappdyn/2009/06/24');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+            $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
 
-                    $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
-                    $cmdName = 'ink_level_' . $logicalIdColor;
-                    $humanName = 'Niveau Encre ' . ucfirst($color);
+            $result = $xml->xpath('//dd:MDNSSupport');
+            $data['mdnsSupport'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:ApplicationServiceName');
+            $data['applicationServiceName'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd3:DomainName');
+            $data['domainName'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:ProxyConfig/dd:ProxySupport');
+            $data['proxySupport'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:SNMPConfigWithVersion/dd:SNMP');
+            $data['snmpSupport'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:WebServicesConfig/dd:WSDiscovery');
+            $data['wsDiscovery'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:WebServicesConfig/dd:WSPrint');
+            $data['wsPrint'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:WebServicesConfig/nadyn:WSScan');
+            $data['wsScan'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:HTTPSRedirection');
+            $data['httpsRedirection'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:Port9100PrintingSupport');
+            $data['port9100PrintingSupport'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:IPPSupport');
+            $data['ippSupport'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:WebScan');
+            $data['webScan'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//nadyn:DirectPrint');
+            $data['directPrint'] = (isset($result[0])) ? (string)$result[0] : '';
+        }
+        return $data;
+    }
 
-                    $cmd = $this->getCmd(null, $cmdName);
-                    if (!is_object($cmd)) {
-                        $cmd = parent::addCmd('info', $cmdName, $humanName, 'numeric', '%');
-                        $cmd->save();
-                    }
-                    $cmd->execCmd((int)$level);
-                }
+    /**
+     * Retrieves print configuration information from the printer.
+     *
+     * @return array An associative array of print configuration data.
+     */
+    public function getPrintConfigInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/PrintConfigDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('prncfgdyn2', 'http://www.hp.com/schemas/imaging/con/ledm/printconfigdyn/2009/05/06');
+            $xml->registerXPathNamespace('prncfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/printconfigdyn/2007/11/02');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+
+            $result = $xml->xpath('//dd:DefaultPrintCopies');
+            $data['defaultPrintCopies'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:DefaultCourier');
+            $data['defaultCourier'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:DefaultPDLInterpreterOrientation');
+            $data['defaultPdlInterpreterOrientation'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:JamRecovery');
+            $data['jamRecovery'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:ResolutionSetting');
+            $data['resolutionSetting'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:BorderlessPrinting');
+            $data['borderlessPrinting'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:PrintQuality');
+            $data['printQuality'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prncfgdyn:ColorLok');
+            $data['colorLok'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prncfgdyn2:InkSliders');
+            $data['inkSliders'] = (isset($result[0])) ? (string)$result[0] : '';
+        }
+        return $data;
+    }
+
+    /**
+     * Retrieves product configuration information from the printer.
+     *
+     * @return array An associative array of product configuration data.
+     */
+    public function getProductConfigInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/ProductConfigDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('prdcfgdyn2', 'http://www.hp.com/schemas/imaging/con/ledm/productconfigdyn/2009/03/16');
+            $xml->registerXPathNamespace('prdcfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/productconfigdyn/2007/11/05');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:Version/dd:Revision');
+            $data['firmwareRevision'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:Version/dd:Date');
+            $data['firmwareDate'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:MakeAndModel');
+            $data['makeAndModel'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:SerialNumber');
+            $data['serialNumber'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:ProductNumber');
+            $data['productNumber'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:PasswordStatus');
+            $data['passwordStatus'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:RegionInformation/dd:RegionIdentifier');
+            $data['regionIdentifier'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:PowerSaveTimeout');
+            $data['powerSaveTimeout'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:AutoOffTime');
+            $data['autoOffTime'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:DeviceLanguage');
+            $data['deviceLanguage'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:PreferredLanguage');
+            $data['preferredLanguage'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:CountryAndRegionName');
+            $data['countryAndRegionName'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:TimeStamp');
+            $data['timestamp'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:TimeFormat');
+            $data['timeFormat'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:DateFormat');
+            $data['dateFormat'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:QuietPrintMode');
+            $data['quietPrintMode'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:Duplex');
+            $data['duplex'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:EWS/dd:EnableDisable');
+            $data['ewsStatus'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:DeviceInformation/dd:DeviceLocation');
+            $data['deviceLocation'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:ControlPanelAccess');
+            $data['controlPanelAccess'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:Memory/dd:AvailableMemory');
+            $data['availableMemoryKB'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//prdcfgdyn:Memory/dd:TotalMemory');
+            $data['totalMemoryKB'] = (isset($result[0])) ? (string)$result[0] : '';
+        }
+        return $data;
+    }
+
+    /**
+     * Retrieves product status information from the printer.
+     *
+     * @return array An associative array of product status data.
+     */
+    public function getProductStatusInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/ProductStatusDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('psdyn', 'http://www.hp.com/schemas/imaging/con/ledm/productstatusdyn/2007/10/31');
+            $xml->registerXPathNamespace('pscat', 'http://www.hp.com/schemas/imaging/con/ledm/productstatuscategories/2007/10/31');
+            $xml->registerXPathNamespace('locid', 'http://www.hp.com/schemas/imaging/con/ledm/localizationids/2007/10/31');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+
+            $result = $xml->xpath('//pscat:StatusCategory');
+            $data['statusCategory'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//locid:StringId');
+            $data['statusStringId'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:ModificationNumber');
+            $data['alertTableModificationNumber'] = (isset($result[0])) ? (string)$result[0] : '';
+        }
+        return $data;
+    }
+
+    /**
+     * Retrieves product usage information from the printer.
+     *
+     * @return array An associative array of product usage data.
+     */
+    public function getProductUsageInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/DevMgmt/ProductUsageDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('pudyn', 'http://www.hp.com/schemas/imaging/con/ledm/productusagedyn/2007/12/11');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+            $xml->registerXPathNamespace('dd2', 'http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10');
+
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:TotalImpressions');
+            $data['totalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:MonochromeImpressions');
+            $data['monochromeImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:ColorImpressions');
+            $data['colorImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:SimplexSheets');
+            $data['simplexSheets'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:DuplexSheets');
+            $data['duplexSheets'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:JamEvents');
+            $data['jamEvents'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:MispickEvents');
+            $data['mispickEvents'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:TotalFrontPanelCancelPresses');
+            $data['totalFrontPanelCancelPresses'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+            $data['cumulativeMarkingAgentUsedTotal'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:Unit');
+            $data['cumulativeMarkingAgentUsedTotalUnit'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:EWSAccessCount');
+            $data['ewsAccessCount'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:NetworkImpressions');
+            $data['networkImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:WirelessNetworkImpressions');
+            $data['wirelessNetworkImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+
+            // Consumable 1 (Color)
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd:MarkerColor');
+            $data['consumable_1_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeConsumableCount');
+            $data['consumable_1_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+            $data['consumable_1_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeMarkingAgentUsed/dd:Unit');
+            $data['consumable_1_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd:ConsumableRawPercentageLevelRemaining');
+            $data['consumable_1_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
+
+            // Consumable 2 (Black)
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd:MarkerColor');
+            $data['consumable_2_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeConsumableCount');
+            $data['consumable_2_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+            $data['consumable_2_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeMarkingAgentUsed/dd:Unit');
+            $data['consumable_2_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd:ConsumableRawPercentageLevelRemaining');
+            $data['consumable_2_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
+
+            $result = $xml->xpath('//pudyn:ScannerEngineSubunit/dd:ScanImages');
+            $data['scannerTotalScanImages'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ScannerEngineSubunit/dd:FlatbedImages');
+            $data['scannerFlatbedImages'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:TotalImpressions');
+            $data['copyTotalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:ColorImpressions');
+            $data['copyColorImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:MonochromeImpressions');
+            $data['copyMonochromeImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:ScanApplicationSubunit/dd:FlatbedImages');
+            $data['scanFlatbedImages'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:TotalImpressions');
+            $data['printTotalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:PhotoImpressions');
+            $data['printPhotoImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:CloudPrintImpressions');
+            $data['printCloudPrintImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+
+            // Usage by Media Type (example for 'plain' and 'photoStandard')
+            $plainImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:TotalImpressions');
+            if (!empty($plainImpressions)) {
+                $data['usage_plain_impressions'] = (string)$plainImpressions[0];
+            }
+            $photoImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="photoStandard"]/dd:TotalImpressions');
+            if (!empty($photoImpressions)) {
+                $data['usage_photoStandard_impressions'] = (string)$photoImpressions[0];
+            }
+
+            // Usage by Quality (example for 'plain' media type)
+            $normalImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:NormalImpressions');
+            if (!empty($normalImpressions)) {
+                $data['usage_plain_normalImpressions'] = (string)$normalImpressions[0];
+            }
+            $draftImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:DraftImpressions');
+            if (!empty($draftImpressions)) {
+                $data['usage_plain_draftImpressions'] = (string)$draftImpressions[0];
+            }
+            $betterImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:BetterImpressions');
+            if (!empty($betterImpressions)) {
+                $data['usage_plain_betterImpressions'] = (string)$betterImpressions[0];
             }
         }
+        return $data;
     }
 
-    $this->pull();
-  }
+    /**
+     * Retrieves I/O configuration information from the printer.
+     *
+     * @return array An associative array of I/O configuration data.
+     */
+    public function getIoConfigInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/IoMgmt/IoConfig.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('io', 'http://www.hp.com/schemas/imaging/con/ledm/iomgmt/2008/11/30');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
+            $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
 
-  // Fonction exécutée automatiquement avant la suppression de l'équipement
-  public function preRemove() {
-  }
-
-  // Fonction exécutée automatiquement après la suppression de l'équipement
-  public function postRemove() {
-  }
-
-  /*
-  * Permet de crypter/décrypter automatiquement des champs de configuration des équipements
-  * Exemple avec le champ "Mot de passe" (password)
-  public function decrypt() {
-    $this->setConfiguration('password', utils::decrypt($this->getConfiguration('password')));
-  }
-  public function encrypt() {
-    $this->setConfiguration('password', utils::encrypt($this->getConfiguration('password')));
-  }
-  */
-
-  private function fetchHtml($url) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // 5 seconds timeout for connection
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);      // 10 seconds timeout for the entire request
-    $html = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($ch);
-    curl_close($ch);
-
-    if ($http_code >= 200 && $http_code < 300) {
-        log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $url . '. HTTP status: ' . $http_code . '. HTML length: ' . strlen($html));
-        return ['html' => $html, 'http_code' => $http_code, 'curl_error' => $curl_error];
-    } else {
-        log::add('hp_printer', 'error', 'Failed to fetch HTML from ' . $url . '. HTTP status: ' . $http_code . '. cURL error: ' . $curl_error);
-        return ['html' => false, 'http_code' => $http_code, 'curl_error' => $curl_error];
-    }
-  }
-  
-  public function pull() {
-    log::add('hp_printer', 'debug', 'Starting pull() for equipment: ' . $this->getName());
-    $ip_address = $this->getConfiguration('ip_address');
-    if (empty($ip_address)) {
-      log::add('hp_printer', 'error', 'Adresse IP de l\'imprimante non configurée pour l\'équipement ' . $this->getName());
-      return;
+            $result = $xml->xpath('//dd3:Hostname');
+            $data['hostname'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd3:DefaultHostname');
+            $data['defaultHostname'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//dd:CurrentHostnameConfigByMethod');
+            $data['currentHostnameConfigByMethod'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//io:IPv4DomainName/dd3:DomainName');
+            $data['ipv4DomainName'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//io:IPv6DomainName/dd3:DomainName');
+            $data['ipv6DomainName'] = (isset($result[0])) ? (string)$result[0] : '';
+        }
+        return $data;
     }
 
-    $urls_to_try = [
-        "http://" . $ip_address . "/",
-        "http://" . $ip_address . "/ProductConfigDyn.xml",
-        "http://" . $ip_address . "/ConsumableConfigDyn.xml"
-    ];
+    /**
+     * Retrieves ePrint configuration information from the printer.
+     *
+     * @return array An associative array of ePrint configuration data.
+     */
+    public function getEPrintConfigInfo() {
+        $data = [];
+        $xml = $this->_fetchXml('/ePrint/ePrintConfigDyn.xml');
+        if ($xml) {
+            $xml->registerXPathNamespace('ep', 'http://www.hp.com/schemas/imaging/con/eprint/2010/04/30');
+            $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
-    $html_result = false;
-    $successful_url = '';
-    foreach ($urls_to_try as $url) {
-        log::add('hp_printer', 'debug', 'Attempting to fetch data from URL: ' . $url);
-        $result = $this->fetchHtml($url);
-        if ($result['html'] !== false) {
-            $html_result = $result;
-            $successful_url = $url;
-            break;
+            $result = $xml->xpath('//ep:CloudConfiguration/ep:EmailService');
+            $data['emailService'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:CloudConfiguration/ep:MobileAppsService');
+            $data['mobileAppsService'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:RegistrationState');
+            $data['registrationState'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:SignalingConnectionState');
+            $data['signalingConnectionState'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:CloudServicesSwitch/ep:Status');
+            $data['cloudServicesSwitchStatus'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:RegistrationDetails/ep:RegistrationStepCompleted');
+            $data['registrationStepCompleted'] = (isset($result[0])) ? (string)$result[0] : '';
+            $result = $xml->xpath('//ep:RegistrationDetails/ep:PlatformIdentifier');
+            $data['platformIdentifier'] = (isset($result[0])) ? (string)$result[0] : '';
         }
+        return $data;
     }
 
-    if ($html_result === false) {
-        log::add('hp_printer', 'error', 'Failed to fetch HTML from all attempted URLs for ' . $this->getName() . '. Last attempt: HTTP status ' . $result['http_code'] . ', cURL error: ' . $result['curl_error']);
-        return;
-    }
-    
-    $html = $html_result['html'];
-    log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $successful_url . '. HTTP status: ' . $html_result['http_code'] . '. HTML length: ' . strlen($html));
+    /**
+     * Pulls all data from the printer and updates Jeedom commands.
+     * This method is intended to be called by a Jeedom cron job.
+     *
+     * @param int $eqLogicId The ID of the Jeedom equipment logic.
+     */
+    public static function pullData($eqLogicId) {
+        log::add('hp_printer', 'info', 'Starting data pull for eqLogic ID: ' . $eqLogicId);
 
-    // --- Extracting Printer Status from ProductStatusDyn.xml ---
-      $productStatusDynUrl = "http://" . $ip_address . "/DevMgmt/ProductStatusDyn.xml";
-      $productStatusDynHtml = $this->fetchHtml($productStatusDynUrl)['html'];
-      if ($productStatusDynHtml !== false && preg_match('/(inPowerSave|ready|offline)/', $productStatusDynHtml, $matches)) {
-        $printerStatus = trim($matches[1]);
-        $cmd = $this->getCmd(null, 'printer_status');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'printer_status', 'Statut Imprimante', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: printer_status');
+        $eqLogic = eqLogic::byId($eqLogicId);
+        if (!is_object($eqLogic)) {
+            log::error('HP Printer Plugin: Invalid eqLogic ID provided: ' . $eqLogicId);
+            return;
         }
-        $cmd->execCmd($printerStatus);
-        log::add('hp_printer', 'debug', 'Printer Status: ' . $printerStatus);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find printer status for ' . $this->getName() . '. Please check ProductStatusDyn.xml content.');
-      }
 
-      // --- Extracting Page Count from ProductUsageDyn.xml ---
-      $productUsageDynUrl = "http://" . $ip_address . "/DevMgmt/ProductUsageDyn.xml";
-      $productUsageDynHtml = $this->fetchHtml($productUsageDynUrl)['html'];
-      if ($productUsageDynHtml !== false && preg_match('/SVN-IPG-LEDM\.119 \d{4}-\d{2}-\d{2} (\d+)/', $productUsageDynHtml, $matches)) {
-        $pageCount = (int)trim($matches[1]);
-        $cmd = $this->getCmd(null, 'page_count');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'page_count', 'Compteur Pages', 'numeric');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: page_count');
+        $ipAddress = $eqLogic->getConfiguration('ipAddress'); // Assuming 'ipAddress' is stored in configuration
+        if (empty($ipAddress)) {
+            log::error('HP Printer Plugin: IP address not configured for eqLogic ID: ' . $eqLogicId);
+            return;
         }
-        $cmd->execCmd($pageCount);
-        log::add('hp_printer', 'debug', 'Page Count: ' . $pageCount);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find page count for ' . $this->getName() . '. Please check ProductUsageDyn.xml content.');
-      }
 
-      // --- Extracting Printer Model from NetAppsDyn.xml ---
-      $netAppsDynUrl = "http://" . $ip_address . "/DevMgmt/NetAppsDyn.xml";
-      $netAppsDynHtml = $this->fetchHtml($netAppsDynUrl)['html'];
-      if ($netAppsDynHtml !== false && preg_match('/HP ENVY (\d+) series/', $netAppsDynHtml, $matches)) {
-        $printerModel = 'HP ENVY ' . trim($matches[1]) . ' series';
-        $cmd = $this->getCmd(null, 'printer_model');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'printer_model', 'Modèle Imprimante', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: printer_model');
-        }
-        $cmd->execCmd($printerModel);
-        log::add('hp_printer', 'debug', 'Printer Model: ' . $printerModel);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find printer model for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
-      }
+        $hpPrinter = new hp_printer($ipAddress);
 
-      // --- Extracting Serial Number from ProductConfigDyn.xml ---
-      $productConfigDynUrl = "http://" . $ip_address . "/DevMgmt/ProductConfigDyn.xml";
-      $productConfigDynHtml = $this->fetchHtml($productConfigDynUrl)['html'];
-      if ($productConfigDynHtml !== false && preg_match('/([A-Z0-9]{10,})/', $productConfigDynHtml, $matches)) {
-        $serialNumber = trim($matches[1]);
-        $cmd = $this->getCmd(null, 'serial_number');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'serial_number', 'Numéro Série', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: serial_number');
-        }
-        $cmd->execCmd($serialNumber);
-        log::add('hp_printer', 'debug', 'Serial Number: ' . $serialNumber);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. Please check ProductConfigDyn.xml content.');
-      }
+        $allData = [];
+        $allData = array_merge($allData, $hpPrinter->getConsumableInfo());
+        $allData = array_merge($allData, $hpPrinter->getNetworkAppInfo());
+        $allData = array_merge($allData, $hpPrinter->getPrintConfigInfo());
+        $allData = array_merge($allData, $hpPrinter->getProductConfigInfo());
+        $allData = array_merge($allData, $hpPrinter->getProductStatusInfo());
+        $allData = array_merge($allData, $hpPrinter->getProductUsageInfo());
+        $allData = array_merge($allData, $hpPrinter->getIoConfigInfo());
+        $allData = array_merge($allData, $hpPrinter->getEPrintConfigInfo());
 
-      // --- Extracting MAC Address from NetAppsDyn.xml ---
-      if ($netAppsDynHtml !== false && preg_match('/HP([0-9A-F]{12})\.local\./', $netAppsDynHtml, $matches)) {
-        $macAddress = trim($matches[1]);
-        $cmd = $this->getCmd(null, 'mac_address');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'mac_address', 'Adresse MAC', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: mac_address');
-        }
-        $cmd->execCmd($macAddress);
-        log::add('hp_printer', 'debug', 'MAC Address: ' . $macAddress);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find MAC address for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
-      }
-
-      // --- Extracting Paper Tray Status (not found in provided samples, leaving as is for now) ---
-      // $paperTrayStatus = ''; // No clear pattern in provided text
-      // log::add('hp_printer', 'warning', 'Could not find paper tray status for ' . $this->getName() . '. No clear pattern in provided text.');
-
-      // --- Extracting Error Messages (not found in provided samples, leaving as is for now) ---
-      // $errorMessages = []; // No clear pattern in provided text
-      // log::add('hp_printer', 'warning', 'Could not find error messages for ' . $this->getName() . '. No clear pattern in provided text.');
-
-      // --- Extracting Network Status from NetAppsDyn.xml ---
-      if ($netAppsDynHtml !== false && preg_match('/IPP\s(enabled|disabled)/', $netAppsDynHtml, $matches)) {
-        $networkStatus = trim($matches[1]);
-        $cmd = $this->getCmd(null, 'network_status');
-        if (!is_object($cmd)) {
-            $cmd = parent::addCmd('info', 'network_status', 'Statut Réseau', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: network_status');
-        }
-        $cmd->execCmd($networkStatus);
-        log::add('hp_printer', 'debug', 'Network Status: ' . $networkStatus);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find network status for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
-      }
-
-      // --- Extracting Ink Levels from ConsumableConfigDyn.xml ---
-      $consumableConfigDynUrl = "http://" . $ip_address . "/DevMgmt/ConsumableConfigDyn.xml";
-      $consumableConfigDynHtml = $this->fetchHtml($consumableConfigDynUrl)['html'];
-      if ($consumableConfigDynHtml !== false) {
-        // Example: "80 userReplaceable 304XL 0 inkCartridge HP 2023-11-01 4 CMYTriDots rotateZero 255 255 255 255 255 255 255 255 255 00000000000000866d75af16b89a1179 0 tenthsOfMilliliters generic class2 notSupported markingAgent TIJ2 00000000000000000000000000000000000000000000000000000000000000000883200D0000366AAFF385F495A591230014810F20BA36002081F40260244FA9 large K newGenuineHP ok HP acknowledge false false false false Eureka everyday3 50 userReplaceable 304XL 1 inkCartridge HP 2024-10-01 4 SmallCircle rotateZero 0 0 0 0 0 0 255 255 255 000000000000003557f9c3f495a59123"
-        if (preg_match_all('/(\d+) userReplaceable .*? (CMY|K)TriDots/', $consumableConfigDynHtml, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $level = $match[1];
-                $color = ($match[2] == 'CMY') ? 'color' : 'black'; // Assuming CMY is color, K is black
-
-                $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
-                $cmdName = 'ink_level_' . $logicalIdColor;
-                $humanName = 'Niveau Encre ' . ucfirst($color);
-
-                $cmd = $this->getCmd(null, $cmdName);
-                if (!is_object($cmd)) {
-                    $cmd = parent::addCmd('info', $cmdName, $humanName, 'numeric', '%');
-                    $cmd->save(); // Save the new command
-                    log::add('hp_printer', 'debug', 'Created new command: ' . $cmdName);
-                }
-                $cmd->execCmd((int)$level);
-                log::add('hp_printer', 'debug', 'Ink Level - ' . $humanName . ': ' . $level . '%');
+        foreach ($allData as $key => $value) {
+            $cmd = $eqLogic->getCmd(null, $key);
+            if (is_object($cmd)) {
+                $cmd->setValue($value)->save();
+                log::debug('HP Printer Plugin: Updated command ' . $key . ' with value ' . $value);
+            } else {
+                log::warning('HP Printer Plugin: Command not found for key: ' . $key);
             }
-        } else {
-            log::add('hp_printer', 'warning', 'Could not find ink levels for ' . $this->getName() . '. Please check ConsumableConfigDyn.xml content.');
         }
-      } else {
-        log::add('hp_printer', 'warning', 'Could not fetch ConsumableConfigDyn.xml for ' . $this->getName());
-      }
-
-      log::add('hp_printer', 'info', 'Data pulled successfully for ' . $this->getName());
-  }
-
-  /*     * **********************Getteur Setteur*************************** */
+        log::add('hp_printer', 'info', 'Finished data pull for eqLogic ID: ' . $eqLogicId);
+    }
 }
-
-class hp_printerCmd extends cmd {
-  /*     * *************************Attributs****************************** */
-
-  /*
-  public static $_widgetPossibility = array();
-  */
-
-  /*     * ***********************Methode static*************************** */
-
-
-  /*     * *********************Methode d'instance************************* */
-
-  /*
-  * Permet d'empêcher la suppression des commandes même si elles ne sont pas dans la nouvelle configuration de l'équipement envoyé en JS
-  public function dontRemoveCmd() {
-    return true;
-  }
-  */
-
-  // Exécution d'une commande
-  public function execute($_options = array()) {
-  }
-
-  /*     * **********************Getteur Setteur*************************** */
-}
+?>

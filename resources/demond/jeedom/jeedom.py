@@ -19,13 +19,10 @@ import logging
 from threading import Thread
 import requests
 from collections.abc import Mapping
-import serial
-import os
 from queue import Queue
 import socketserver
 from socketserver import (TCPServer, StreamRequestHandler)
 import unicodedata
-import pyudev
 
 
 class jeedom_com():
@@ -137,21 +134,7 @@ class jeedom_utils():
         FORMAT = '[%(asctime)-15s][%(levelname)s] : %(message)s'
         logging.basicConfig(level=jeedom_utils.convert_log_level(level), format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
 
-    @staticmethod
-    def find_tty_usb(idVendor, idProduct, product=None):
-        context = pyudev.Context()
-        for device in context.list_devices(subsystem='tty'):
-            if 'ID_VENDOR' not in device:
-                continue
-            if device['ID_VENDOR_ID'] != idVendor:
-                continue
-            if device['ID_MODEL_ID'] != idProduct:
-                continue
-            if product is not None:
-                if 'ID_VENDOR' not in device or device['ID_VENDOR'].lower().find(product.lower()) == -1:
-                    continue
-            return str(device.device_node)
-        return None
+    
 
     @staticmethod
     def stripped(str):
@@ -201,120 +184,4 @@ class jeedom_utils():
         return ' '.join([hex[i:i + 2] for i in range(0, len(hex), 2)])
 
 
-class jeedom_serial():
 
-    def __init__(self, device='', rate='', timeout=9, rtscts=True, xonxoff=False):
-        self.device = device
-        self.rate = rate
-        self.timeout = timeout
-        self.port = None
-        self.rtscts = rtscts
-        self.xonxoff = xonxoff
-        logging.info('Init serial module v%s', serial.VERSION)
-
-    def open(self):
-        if self.device:
-            logging.info("Open serial port on device: %s, rate %s, timeout: %i", self.device, self.rate, self.timeout)
-        else:
-            logging.error("Device name missing.")
-            return False
-        logging.info("Open Serialport")
-        try:
-            self.port = serial.Serial(
-                self.device,
-                self.rate,
-                timeout=self.timeout,
-                rtscts=self.rtscts,
-                xonxoff=self.xonxoff,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE
-            )
-        except serial.SerialException as e:
-            logging.error("Error: Failed to connect on device %s. Details : %s", self.device, e)
-            return False
-        if not self.port.isOpen():
-            self.port.open()
-        self.flushOutput()
-        self.flushInput()
-        return True
-
-    def close(self):
-        logging.info("Close serial port")
-        try:
-            self.port.close()
-            logging.info("Serial port closed")
-            return True
-        except serial.SerialException as e:
-            logging.error("Failed to close the serial port (%s): %s", self.device, e)
-            return False
-
-    def write(self, data):
-        logging.info("Write data to serial port: %s", str(jeedom_utils.ByteToHex(data)))
-        self.port.write(data)
-
-    def flushOutput(self,):
-        logging.info("flushOutput serial port ")
-        self.port.flushOutput()
-
-    def flushInput(self):
-        logging.info("flushInput serial port ")
-        self.port.flushInput()
-
-    def read(self):
-        if self.port.inWaiting() != 0:
-            return self.port.read()
-        return None
-
-    def readbytes(self, number):
-        buf = b''
-        for i in range(number):
-            try:
-                byte = self.port.read()
-            except IOError as e:
-                logging.error("Error: %s", e)
-            except OSError as e:
-                logging.error("Error: %s", e)
-            buf += byte
-        return buf
-
-
-JEEDOM_SOCKET_MESSAGE = Queue()
-
-
-class jeedom_socket_handler(StreamRequestHandler):
-    def handle(self):
-        global JEEDOM_SOCKET_MESSAGE
-        logging.info("Client connected to [%s:%d]", self.client_address[0], self.client_address[1])
-        lg = self.rfile.readline()
-        JEEDOM_SOCKET_MESSAGE.put(lg)
-        logging.info("Message read from socket: %s", str(lg.strip()))
-        self.netAdapterClientConnected = False
-        logging.info("Client disconnected from [%s:%d]", self.client_address[0], self.client_address[1])
-
-
-class jeedom_socket():
-
-    def __init__(self, address='localhost', port=55000):
-        self.address = address
-        self.port = port
-        socketserver.TCPServer.allow_reuse_address = True
-
-    def open(self):
-        self.netAdapter = TCPServer((self.address, self.port), jeedom_socket_handler)
-        if self.netAdapter:
-            logging.info("Socket interface started")
-            Thread(target=self.loopNetServer).start()
-        else:
-            logging.info("Cannot start socket interface")
-
-    def loopNetServer(self):
-        logging.info("LoopNetServer Thread started")
-        logging.info("Listening on: [%s:%d]", self.address, self.port)
-        self.netAdapter.serve_forever()
-        logging.info("LoopNetServer Thread stopped")
-
-    def close(self):
-        self.netAdapter.shutdown()
-
-    def getMessage(self):
-        return self.message

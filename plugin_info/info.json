@@ -4,7 +4,7 @@
 	"pluginVersion": "0.1",
 	"icon": "hp_printer_icon.png",
 	"description": {
-		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS)."
+		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS)"
 	},
 	"licence": "AGPL",
 	"author": "Teeflo",
@@ -28,8 +28,7 @@
 		"de_DE",
 		"ru_RU",
 		"id_ID",
-		"it_IT",
-		"ja_JP",
+		"it_IT",		"ja_JP",
 		"pt_PT"
 	],
 	"compatibility": [
@@ -40,5 +39,14 @@
 		"docker",
 		"diy",
 		"mobile"
+	],
+	"commands": "plugin_info/commands.json",
+	"cron": [
+		{
+			"id": "pullData",
+			"schedule": "*/5 * * * *",
+			"class": "hp_printer",
+			"function": "pullData"
+		}
 	]
 }
