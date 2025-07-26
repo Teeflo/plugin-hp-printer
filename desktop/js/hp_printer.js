@@ -7,7 +7,11 @@ $('#bt_refresh_data').on('click', function() {
 
         $.ajax({
             type: 'POST',
-            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+            url: createUrl({
+                action: 'pullData',
+                plugin: 'hp_printer',
+                type: 'ajax'
+            }),
             data: {
                 action: 'pullData',
                 eqLogic_id: eqLogicId

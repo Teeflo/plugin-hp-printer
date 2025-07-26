@@ -29,6 +29,15 @@ if (!isConnect()) {
       <div class="col-md-4">
         <input class="configKey form-control" data-l1key="hp_printer_ip" placeholder="192.168.1.100"/>
       </div>
+    </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Protocole}}</label>
+      <div class="col-md-4">
+        <select class="configKey form-control" data-l1key="hp_printer_protocol">
+          <option value="http">{{HTTP}}</option>
+          <option value="https">{{HTTPS}}</option>
+        </select>
+      </div>
       <div class="col-md-2">
         <a class="btn btn-default" id="bt_testHpPrinter"><i class="fas fa-check"></i> {{Tester}}</a>
       </div>
@@ -38,13 +47,23 @@ if (!isConnect()) {
 <script>
 $('#bt_testHpPrinter').on('click', function(){
   var ip_address = $('.configKey[data-l1key=hp_printer_ip]').val();
+  var protocol = $('.configKey[data-l1key=hp_printer_protocol]').val(); // Assuming a protocol field will be added
   jeedomUtils.hideAlert();
+
+  // Simple validation for IP address format (IPv4)
+  var ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (!ipRegex.test(ip_address)) {
+      $('#div_alert').showAlert({message: '{{Veuillez entrer une adresse IP valide (ex: 192.168.1.100)}}', level: 'danger'});
+      return; // Stop execution if IP is invalid
+  }
+
   $.ajax({
     type: 'POST',
     url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
     data: {
       action: 'test',
-      ip_address: ip_address
+      ip_address: ip_address,
+      protocol: protocol
     },
     dataType: 'json',
     error: function (request, status, error) {

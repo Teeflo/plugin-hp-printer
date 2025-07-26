@@ -7,14 +7,17 @@
 class hp_printer {
 
     private $ipAddress; // The IP address of the HP printer
+    private $protocol; // The protocol to use (http or https)
 
     /**
      * Constructor
      *
      * @param string $ipAddress The IP address of the HP printer.
+     * @param string $protocol The protocol to use (http or https). Defaults to 'http'.
      */
-    public function __construct($ipAddress) {
+    public function __construct($ipAddress, $protocol = 'http') {
         $this->ipAddress = $ipAddress;
+        $this->protocol = $protocol;
     }
 
     /**
@@ -24,11 +27,18 @@ class hp_printer {
      * @return SimpleXMLElement|false Returns a SimpleXMLElement object on success, or false on failure.
      */
     private function _fetchXml($path) {
-        $url = "http://" . $this->ipAddress . $path;
+        $url = $this->protocol . "://" . $this->ipAddress . $path;
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 seconds timeout
+
+        if ($this->protocol === 'https') {
+            // WARNING: For testing, disable SSL verification. In production, use proper CA certs.
+            // Consider adding an option in Jeedom config to enable/disable SSL verification.
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        }
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -50,10 +60,21 @@ class hp_printer {
             }
             libxml_clear_errors();
             log::error("HP Printer Plugin: Failed to parse XML from {$url}. Errors: " . implode(", ", $errors));
-            // Return an empty SimpleXMLElement to prevent errors in subsequent XPath queries
-            return new SimpleXMLElement('<root/>');
+            return false;
         }
         return $xml;
+    }
+
+    /**
+     * Helper function to safely get a single XPath result as a string.
+     *
+     * @param SimpleXMLElement $xml The SimpleXMLElement object.
+     * @param string $xpath The XPath query.
+     * @return string The string value of the first result, or an empty string if not found.
+     */
+    private function _getXpathValue(SimpleXMLElement $xml, $xpath) {
+        $result = $xml->xpath($xpath);
+        return (isset($result[0])) ? (string)$result[0] : '';
     }
 
     /**
@@ -70,33 +91,21 @@ class hp_printer {
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd2', 'http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10');
 
-            $result = $xml->xpath('//dd:NumOfUserReplaceableConsumables');
-            $data['numOfUserReplaceableConsumables'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:NumOfNonUserReplaceableConsumables');
-            $data['numOfNonUserReplaceableConsumables'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:AlignmentMode');
-            $data['alignmentMode'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ccdyn:SingleCartridgeMode');
-            $data['singleCartridgeMode'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['numOfUserReplaceableConsumables'] = $this->_getXpathValue($xml, '//dd:NumOfUserReplaceableConsumables');
+            $data['numOfNonUserReplaceableConsumables'] = $this->_getXpathValue($xml, '//dd:NumOfNonUserReplaceableConsumables');
+            $data['alignmentMode'] = $this->_getXpathValue($xml, '//dd:AlignmentMode');
+            $data['singleCartridgeMode'] = $this->_getXpathValue($xml, '//ccdyn:SingleCartridgeMode');
 
             $consumables = $xml->xpath('//ccdyn:ConsumableInfo');
             foreach ($consumables as $index => $consumable) {
-                $result = $consumable->xpath('./dd:ConsumablePercentageLevelRemaining');
-                $data['consumable_' . ($index + 1) . '_percentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd:ConsumableSelectibilityNumber');
-                $data['consumable_' . ($index + 1) . '_selectibilityNumber'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd:ConsumableLifeState/dd:ConsumableState');
-                $data['consumable_' . ($index + 1) . '_lifeState'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd:MarkerColor');
-                $data['consumable_' . ($index + 1) . '_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd2:CumulativeConsumableCount');
-                $data['consumable_' . ($index + 1) . '_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
-                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd2:CumulativeMarkingAgentUsed/dd:Unit');
-                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
-                $result = $consumable->xpath('./dd:ConsumableRawPercentageLevelRemaining');
-                $data['consumable_' . ($index + 1) . '_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
+                $data['consumable_' . ($index + 1) . '_percentageLevelRemaining'] = $this->_getXpathValue($consumable, './dd:ConsumablePercentageLevelRemaining');
+                $data['consumable_' . ($index + 1) . '_selectibilityNumber'] = $this->_getXpathValue($consumable, './dd:ConsumableSelectibilityNumber');
+                $data['consumable_' . ($index + 1) . '_lifeState'] = $this->_getXpathValue($consumable, './dd:ConsumableLifeState/dd:ConsumableState');
+                $data['consumable_' . ($index + 1) . '_markerColor'] = $this->_getXpathValue($consumable, './dd:MarkerColor');
+                $data['consumable_' . ($index + 1) . '_cumulativeConsumableCount'] = $this->_getXpathValue($consumable, './dd2:CumulativeConsumableCount');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsed'] = $this->_getXpathValue($consumable, './dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsedUnit'] = $this->_getXpathValue($consumable, './dd2:CumulativeMarkingAgentUsed/dd:Unit');
+                $data['consumable_' . ($index + 1) . '_rawPercentageLevelRemaining'] = $this->_getXpathValue($consumable, './dd:ConsumableRawPercentageLevelRemaining');
             }
         }
         return $data;
@@ -115,32 +124,19 @@ class hp_printer {
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
 
-            $result = $xml->xpath('//dd:MDNSSupport');
-            $data['mdnsSupport'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:ApplicationServiceName');
-            $data['applicationServiceName'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd3:DomainName');
-            $data['domainName'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:ProxyConfig/dd:ProxySupport');
-            $data['proxySupport'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:SNMPConfigWithVersion/dd:SNMP');
-            $data['snmpSupport'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:WebServicesConfig/dd:WSDiscovery');
-            $data['wsDiscovery'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:WebServicesConfig/dd:WSPrint');
-            $data['wsPrint'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:WebServicesConfig/nadyn:WSScan');
-            $data['wsScan'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:HTTPSRedirection');
-            $data['httpsRedirection'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:Port9100PrintingSupport');
-            $data['port9100PrintingSupport'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:IPPSupport');
-            $data['ippSupport'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:WebScan');
-            $data['webScan'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//nadyn:DirectPrint');
-            $data['directPrint'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['mdnsSupport'] = $this->_getXpathValue($xml, '//dd:MDNSSupport');
+            $data['applicationServiceName'] = $this->_getXpathValue($xml, '//dd:ApplicationServiceName');
+            $data['domainName'] = $this->_getXpathValue($xml, '//dd3:DomainName');
+            $data['proxySupport'] = $this->_getXpathValue($xml, '//nadyn:ProxyConfig/dd:ProxySupport');
+            $data['snmpSupport'] = $this->_getXpathValue($xml, '//dd:SNMPConfigWithVersion/dd:SNMP');
+            $data['wsDiscovery'] = $this->_getXpathValue($xml, '//nadyn:WebServicesConfig/dd:WSDiscovery');
+            $data['wsPrint'] = $this->_getXpathValue($xml, '//nadyn:WebServicesConfig/dd:WSPrint');
+            $data['wsScan'] = $this->_getXpathValue($xml, '//nadyn:WebServicesConfig/nadyn:WSScan');
+            $data['httpsRedirection'] = $this->_getXpathValue($xml, '//dd:HTTPSRedirection');
+            $data['port9100PrintingSupport'] = $this->_getXpathValue($xml, '//dd:Port9100PrintingSupport');
+            $data['ippSupport'] = $this->_getXpathValue($xml, '//dd:IPPSupport');
+            $data['webScan'] = $this->_getXpathValue($xml, '//nadyn:WebScan');
+            $data['directPrint'] = $this->_getXpathValue($xml, '//nadyn:DirectPrint');
         }
         return $data;
     }
@@ -158,24 +154,15 @@ class hp_printer {
             $xml->registerXPathNamespace('prncfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/printconfigdyn/2007/11/02');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
-            $result = $xml->xpath('//dd:DefaultPrintCopies');
-            $data['defaultPrintCopies'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:DefaultCourier');
-            $data['defaultCourier'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:DefaultPDLInterpreterOrientation');
-            $data['defaultPdlInterpreterOrientation'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:JamRecovery');
-            $data['jamRecovery'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:ResolutionSetting');
-            $data['resolutionSetting'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:BorderlessPrinting');
-            $data['borderlessPrinting'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:PrintQuality');
-            $data['printQuality'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prncfgdyn:ColorLok');
-            $data['colorLok'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prncfgdyn2:InkSliders');
-            $data['inkSliders'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['defaultPrintCopies'] = $this->_getXpathValue($xml, '//dd:DefaultPrintCopies');
+            $data['defaultCourier'] = $this->_getXpathValue($xml, '//dd:DefaultCourier');
+            $data['defaultPdlInterpreterOrientation'] = $this->_getXpathValue($xml, '//dd:DefaultPDLInterpreterOrientation');
+            $data['jamRecovery'] = $this->_getXpathValue($xml, '//dd:JamRecovery');
+            $data['resolutionSetting'] = $this->_getXpathValue($xml, '//dd:ResolutionSetting');
+            $data['borderlessPrinting'] = $this->_getXpathValue($xml, '//dd:BorderlessPrinting');
+            $data['printQuality'] = $this->_getXpathValue($xml, '//dd:PrintQuality');
+            $data['colorLok'] = $this->_getXpathValue($xml, '//prncfgdyn:ColorLok');
+            $data['inkSliders'] = $this->_getXpathValue($xml, '//prncfgdyn2:InkSliders');
         }
         return $data;
     }
@@ -193,50 +180,28 @@ class hp_printer {
             $xml->registerXPathNamespace('prdcfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/productconfigdyn/2007/11/05');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:Version/dd:Revision');
-            $data['firmwareRevision'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:Version/dd:Date');
-            $data['firmwareDate'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:MakeAndModel');
-            $data['makeAndModel'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:SerialNumber');
-            $data['serialNumber'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:ProductNumber');
-            $data['productNumber'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:PasswordStatus');
-            $data['passwordStatus'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:ProductInformation/dd:RegionInformation/dd:RegionIdentifier');
-            $data['regionIdentifier'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:PowerSaveTimeout');
-            $data['powerSaveTimeout'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:AutoOffTime');
-            $data['autoOffTime'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:DeviceLanguage');
-            $data['deviceLanguage'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:PreferredLanguage');
-            $data['preferredLanguage'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:CountryAndRegionName');
-            $data['countryAndRegionName'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:TimeStamp');
-            $data['timestamp'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:TimeFormat');
-            $data['timeFormat'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:DateFormat');
-            $data['dateFormat'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:QuietPrintMode');
-            $data['quietPrintMode'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:Duplex');
-            $data['duplex'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:EWS/dd:EnableDisable');
-            $data['ewsStatus'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/prdcfgdyn:DeviceInformation/dd:DeviceLocation');
-            $data['deviceLocation'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn2:ProductSettings/dd:ControlPanelAccess');
-            $data['controlPanelAccess'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:Memory/dd:AvailableMemory');
-            $data['availableMemoryKB'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//prdcfgdyn:Memory/dd:TotalMemory');
-            $data['totalMemoryKB'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['firmwareRevision'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:Version/dd:Revision');
+            $data['firmwareDate'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:Version/dd:Date');
+            $data['makeAndModel'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:MakeAndModel');
+            $data['serialNumber'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:SerialNumber');
+            $data['productNumber'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:ProductNumber');
+            $data['passwordStatus'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:PasswordStatus');
+            $data['regionIdentifier'] = $this->_getXpathValue($xml, '//prdcfgdyn:ProductInformation/dd:RegionInformation/dd:RegionIdentifier');
+            $data['powerSaveTimeout'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:PowerSaveTimeout');
+            $data['autoOffTime'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:AutoOffTime');
+            $data['deviceLanguage'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:DeviceLanguage');
+            $data['preferredLanguage'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/prdcfgdyn:ProductLanguage/dd:PreferredLanguage');
+            $data['countryAndRegionName'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/prdcfgdyn:CountryAndRegionName');
+            $data['timestamp'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:TimeStamp');
+            $data['timeFormat'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:TimeFormat');
+            $data['dateFormat'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:DateFormat');
+            $data['quietPrintMode'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:QuietPrintMode');
+            $data['duplex'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:Duplex');
+            $data['ewsStatus'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/prdcfgdyn:EWS/dd:EnableDisable');
+            $data['deviceLocation'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/prdcfgdyn:DeviceInformation/dd:DeviceLocation');
+            $data['controlPanelAccess'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:ControlPanelAccess');
+            $data['availableMemoryKB'] = $this->_getXpathValue($xml, '//prdcfgdyn:Memory/dd:AvailableMemory');
+            $data['totalMemoryKB'] = $this->_getXpathValue($xml, '//prdcfgdyn:Memory/dd:TotalMemory');
         }
         return $data;
     }
@@ -255,12 +220,9 @@ class hp_printer {
             $xml->registerXPathNamespace('locid', 'http://www.hp.com/schemas/imaging/con/ledm/localizationids/2007/10/31');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
-            $result = $xml->xpath('//pscat:StatusCategory');
-            $data['statusCategory'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//locid:StringId');
-            $data['statusStringId'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:ModificationNumber');
-            $data['alertTableModificationNumber'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['statusCategory'] = $this->_getXpathValue($xml, '//pscat:StatusCategory');
+            $data['statusStringId'] = $this->_getXpathValue($xml, '//locid:StringId');
+            $data['alertTableModificationNumber'] = $this->_getXpathValue($xml, '//dd:ModificationNumber');
         }
         return $data;
     }
@@ -278,75 +240,39 @@ class hp_printer {
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd2', 'http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10');
 
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:TotalImpressions');
-            $data['totalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:MonochromeImpressions');
-            $data['monochromeImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:ColorImpressions');
-            $data['colorImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:SimplexSheets');
-            $data['simplexSheets'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:DuplexSheets');
-            $data['duplexSheets'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:JamEvents');
-            $data['jamEvents'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:MispickEvents');
-            $data['mispickEvents'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:TotalFrontPanelCancelPresses');
-            $data['totalFrontPanelCancelPresses'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
-            $data['cumulativeMarkingAgentUsedTotal'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:Unit');
-            $data['cumulativeMarkingAgentUsedTotalUnit'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:EWSAccessCount');
-            $data['ewsAccessCount'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:NetworkImpressions');
-            $data['networkImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrinterSubunit/dd:WirelessNetworkImpressions');
-            $data['wirelessNetworkImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['totalImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:TotalImpressions');
+            $data['monochromeImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:MonochromeImpressions');
+            $data['colorImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:ColorImpressions');
+            $data['simplexSheets'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:SimplexSheets');
+            $data['duplexSheets'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:DuplexSheets');
+            $data['jamEvents'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:JamEvents');
+            $data['mispickEvents'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:MispickEvents');
+            $data['totalFrontPanelCancelPresses'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:TotalFrontPanelCancelPresses');
+            $data['cumulativeMarkingAgentUsedTotal'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+            $data['cumulativeMarkingAgentUsedTotalUnit'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/pudyn:UsageByMarkingAgent/dd2:CumulativeMarkingAgentUsed/dd:Unit');
+            $data['ewsAccessCount'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:EWSAccessCount');
+            $data['networkImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:NetworkImpressions');
+            $data['wirelessNetworkImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrinterSubunit/dd:WirelessNetworkImpressions');
 
-            // Consumable 1 (Color)
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd:MarkerColor');
-            $data['consumable_1_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeConsumableCount');
-            $data['consumable_1_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
-            $data['consumable_1_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd2:CumulativeMarkingAgentUsed/dd:Unit');
-            $data['consumable_1_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[1]/dd:ConsumableRawPercentageLevelRemaining');
-            $data['consumable_1_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
+            // Consumables (dynamic iteration)
+            $consumables = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable');
+            foreach ($consumables as $index => $consumable) {
+                $data['consumable_' . ($index + 1) . '_markerColor'] = $this->_getXpathValue($consumable, './dd:MarkerColor');
+                $data['consumable_' . ($index + 1) . '_cumulativeConsumableCount'] = $this->_getXpathValue($consumable, './dd2:CumulativeConsumableCount');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsed'] = $this->_getXpathValue($consumable, './dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
+                $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsedUnit'] = $this->_getXpathValue($consumable, './dd2:CumulativeMarkingAgentUsed/dd:Unit');
+                $data['consumable_' . ($index + 1) . '_rawPercentageLevelRemaining'] = $this->_getXpathValue($consumable, './dd:ConsumableRawPercentageLevelRemaining');
+            }
 
-            // Consumable 2 (Black)
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd:MarkerColor');
-            $data['consumable_2_markerColor'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeConsumableCount');
-            $data['consumable_2_cumulativeConsumableCount'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeMarkingAgentUsed/dd:ValueFloat');
-            $data['consumable_2_cumulativeMarkingAgentUsed'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd2:CumulativeMarkingAgentUsed/dd:Unit');
-            $data['consumable_2_cumulativeMarkingAgentUsedUnit'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ConsumableSubunit/pudyn:Consumable[2]/dd:ConsumableRawPercentageLevelRemaining');
-            $data['consumable_2_rawPercentageLevelRemaining'] = (isset($result[0])) ? (string)$result[0] : '';
-
-            $result = $xml->xpath('//pudyn:ScannerEngineSubunit/dd:ScanImages');
-            $data['scannerTotalScanImages'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ScannerEngineSubunit/dd:FlatbedImages');
-            $data['scannerFlatbedImages'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:TotalImpressions');
-            $data['copyTotalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:ColorImpressions');
-            $data['copyColorImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:CopyApplicationSubunit/dd:MonochromeImpressions');
-            $data['copyMonochromeImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:ScanApplicationSubunit/dd:FlatbedImages');
-            $data['scanFlatbedImages'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:TotalImpressions');
-            $data['printTotalImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:PhotoImpressions');
-            $data['printPhotoImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//pudyn:PrintApplicationSubunit/dd:CloudPrintImpressions');
-            $data['printCloudPrintImpressions'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['scannerTotalScanImages'] = $this->_getXpathValue($xml, '//pudyn:ScannerEngineSubunit/dd:ScanImages');
+            $data['scannerFlatbedImages'] = $this->_getXpathValue($xml, '//pudyn:ScannerEngineSubunit/dd:FlatbedImages');
+            $data['copyTotalImpressions'] = $this->_getXpathValue($xml, '//pudyn:CopyApplicationSubunit/dd:TotalImpressions');
+            $data['copyColorImpressions'] = $this->_getXpathValue($xml, '//pudyn:CopyApplicationSubunit/dd:ColorImpressions');
+            $data['copyMonochromeImpressions'] = $this->_getXpathValue($xml, '//pudyn:CopyApplicationSubunit/dd:MonochromeImpressions');
+            $data['scanFlatbedImages'] = $this->_getXpathValue($xml, '//pudyn:ScanApplicationSubunit/dd:FlatbedImages');
+            $data['printTotalImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrintApplicationSubunit/dd:TotalImpressions');
+            $data['printPhotoImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrintApplicationSubunit/dd:PhotoImpressions');
+            $data['printCloudPrintImpressions'] = $this->_getXpathValue($xml, '//pudyn:PrintApplicationSubunit/dd:CloudPrintImpressions');
 
             // Usage by Media Type (example for 'plain' and 'photoStandard')
             $plainImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:TotalImpressions');
@@ -359,17 +285,18 @@ class hp_printer {
             }
 
             // Usage by Quality (example for 'plain' media type)
-            $normalImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:NormalImpressions');
+            $normalImpressions = $this->_getXpathValue($xml, '//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:NormalImpressions');
+            $draftImpressions = $this->_getXpathValue($xml, '//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:DraftImpressions');
+            $betterImpressions = $this->_getXpathValue($xml, '//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:BetterImpressions');
+
             if (!empty($normalImpressions)) {
-                $data['usage_plain_normalImpressions'] = (string)$normalImpressions[0];
+                $data['usage_plain_normalImpressions'] = $normalImpressions;
             }
-            $draftImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:DraftImpressions');
             if (!empty($draftImpressions)) {
-                $data['usage_plain_draftImpressions'] = (string)$draftImpressions[0];
+                $data['usage_plain_draftImpressions'] = $draftImpressions;
             }
-            $betterImpressions = $xml->xpath('//pudyn:UsageByMediaType[dd:MediaType="plain"]/dd:UsageByQuality/dd:BetterImpressions');
             if (!empty($betterImpressions)) {
-                $data['usage_plain_betterImpressions'] = (string)$betterImpressions[0];
+                $data['usage_plain_betterImpressions'] = $betterImpressions;
             }
         }
         return $data;
@@ -388,16 +315,11 @@ class hp_printer {
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
 
-            $result = $xml->xpath('//dd3:Hostname');
-            $data['hostname'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd3:DefaultHostname');
-            $data['defaultHostname'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//dd:CurrentHostnameConfigByMethod');
-            $data['currentHostnameConfigByMethod'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//io:IPv4DomainName/dd3:DomainName');
-            $data['ipv4DomainName'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//io:IPv6DomainName/dd3:DomainName');
-            $data['ipv6DomainName'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['hostname'] = $this->_getXpathValue($xml, '//dd3:Hostname');
+            $data['defaultHostname'] = $this->_getXpathValue($xml, '//dd3:DefaultHostname');
+            $data['currentHostnameConfigByMethod'] = $this->_getXpathValue($xml, '//dd:CurrentHostnameConfigByMethod');
+            $data['ipv4DomainName'] = $this->_getXpathValue($xml, '//io:IPv4DomainName/dd3:DomainName');
+            $data['ipv6DomainName'] = $this->_getXpathValue($xml, '//io:IPv6DomainName/dd3:DomainName');
         }
         return $data;
     }
@@ -414,20 +336,13 @@ class hp_printer {
             $xml->registerXPathNamespace('ep', 'http://www.hp.com/schemas/imaging/con/eprint/2010/04/30');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
-            $result = $xml->xpath('//ep:CloudConfiguration/ep:EmailService');
-            $data['emailService'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:CloudConfiguration/ep:MobileAppsService');
-            $data['mobileAppsService'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:RegistrationState');
-            $data['registrationState'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:SignalingConnectionState');
-            $data['signalingConnectionState'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:CloudServicesSwitch/ep:Status');
-            $data['cloudServicesSwitchStatus'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:RegistrationDetails/ep:RegistrationStepCompleted');
-            $data['registrationStepCompleted'] = (isset($result[0])) ? (string)$result[0] : '';
-            $result = $xml->xpath('//ep:RegistrationDetails/ep:PlatformIdentifier');
-            $data['platformIdentifier'] = (isset($result[0])) ? (string)$result[0] : '';
+            $data['emailService'] = $this->_getXpathValue($xml, '//ep:CloudConfiguration/ep:EmailService');
+            $data['mobileAppsService'] = $this->_getXpathValue($xml, '//ep:CloudConfiguration/ep:MobileAppsService');
+            $data['registrationState'] = $this->_getXpathValue($xml, '//ep:RegistrationState');
+            $data['signalingConnectionState'] = $this->_getXpathValue($xml, '//ep:SignalingConnectionState');
+            $data['cloudServicesSwitchStatus'] = $this->_getXpathValue($xml, '//ep:CloudServicesSwitch/ep:Status');
+            $data['registrationStepCompleted'] = $this->_getXpathValue($xml, '//ep:RegistrationDetails/ep:RegistrationStepCompleted');
+            $data['platformIdentifier'] = $this->_getXpathValue($xml, '//ep:RegistrationDetails/ep:PlatformIdentifier');
         }
         return $data;
     }
@@ -453,7 +368,8 @@ class hp_printer {
             return;
         }
 
-        $hpPrinter = new hp_printer($ipAddress);
+        $protocol = $eqLogic->getConfiguration('protocol', 'http'); // Assuming 'protocol' is stored in configuration, default to 'http'
+        $hpPrinter = new hp_printer($ipAddress, $protocol);
 
         $allData = [];
         $allData = array_merge($allData, $hpPrinter->getConsumableInfo());
@@ -471,7 +387,7 @@ class hp_printer {
                 $cmd->setValue($value)->save();
                 log::debug('HP Printer Plugin: Updated command ' . $key . ' with value ' . $value);
             } else {
-                log::warning('HP Printer Plugin: Command not found for key: ' . $key);
+                log::debug('HP Printer Plugin: Command not found for key: ' . $key);
             }
         }
         log::add('hp_printer', 'info', 'Finished data pull for eqLogic ID: ' . $eqLogicId);

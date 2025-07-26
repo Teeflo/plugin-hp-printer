@@ -55,6 +55,15 @@ $ipAddress = $eqLogic->getConfiguration('ipAddress');
                             </div>
                         </div>
                         <div class="form-group">
+                            <label class="col-sm-3 control-label">{{Protocole}}</label>
+                            <div class="col-sm-6">
+                                <select class="form-control eqLogicAttr" data-l1key="configuration" data-l2key="protocol">
+                                    <option value="http" {{($eqLogic->getConfiguration('protocol', 'http') == 'http') ? 'selected' : ''}}>{{HTTP}}</option>
+                                    <option value="https" {{($eqLogic->getConfiguration('protocol', 'http') == 'https') ? 'selected' : ''}}>{{HTTPS}}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label class="col-sm-3 control-label">{{Activer}}</label>
                             <div class="col-sm-6">
                                 <label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="isEnable" checked>{{Activer}}</label>
@@ -106,7 +115,7 @@ $ipAddress = $eqLogic->getConfiguration('ipAddress');
                         echo '<tr><td>{{Device Language}}</td><td>' . (isset($data['deviceLanguage']) ? $data['deviceLanguage'] : '') . '</td></tr>';
                         echo '<tr><td>{{Preferred Language}}</td><td>' . (isset($data['preferredLanguage']) ? $data['preferredLanguage'] : '') . '</td></tr>';
                         echo '<tr><td>{{Country and Region}}</td><td>' . (isset($data['countryAndRegionName']) ? $data['countryAndRegionName'] : '') . '</td></tr>';
-                        echo '<tr><td>{{Printer Timestamp}}</td><td>' . (isset($data['printerTimestamp']) ? $data['printerTimestamp'] : '') . '</td></tr>';
+                        echo '<tr><td>{{Printer Timestamp}}</td><td>' . (isset($data['timestamp']) ? $data['timestamp'] : '') . '</td></tr>';
                         echo '<tr><td>{{Time Format}}</td><td>' . (isset($data['timeFormat']) ? $data['timeFormat'] : '') . '</td></tr>';
                         echo '<tr><td>{{Date Format}}</td><td>' . (isset($data['dateFormat']) ? $data['dateFormat'] : '') . '</td></tr>';
                         echo '<tr><td>{{Quiet Print Mode}}</td><td>' . (isset($data['quietPrintMode']) ? $data['quietPrintMode'] : '') . '</td></tr>';

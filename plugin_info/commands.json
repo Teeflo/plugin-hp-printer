@@ -88,7 +88,7 @@
         "name": "Printer Timestamp",
         "type": "info",
         "subType": "string",
-        "logicalId": "timestamp"
+        "logicalId": "printerTimestamp"
     },
     {
         "id": "timeFormat",

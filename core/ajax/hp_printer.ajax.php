@@ -34,8 +34,15 @@ switch (init('action')) {
             ajax::success(array('state' => 'error', 'result' => __('IP address cannot be empty', __FILE__)));
         }
 
+        // Validate IP address format
+        if (!filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+            ajax::success(array('state' => 'error', 'result' => __('Invalid IP address format', __FILE__)));
+        }
+
         try {
-            $hpPrinter = new hp_printer($ipAddress);
+            // Assuming 'protocol' is stored in configuration, default to 'http'
+            $protocol = init('protocol', 'http'); // Get protocol from AJAX request, default to http
+            $hpPrinter = new hp_printer($ipAddress, $protocol);
             $testData = $hpPrinter->getProductConfigInfo(); // Attempt to fetch some data
 
             if (!empty($testData)) {
