@@ -48,6 +48,52 @@ class hp_printer extends eqLogic {
     // This cron is not used as we have a configurable cron
   }
   
+  public static function deamon_start() {
+    $deamon_info = self::deamon_info();
+    if ($deamon_info['state'] == 'ok') {
+      return;
+    }
+    log::add('hp_printer', 'info', 'Lancement du démon');
+    $path = realpath(dirname(__FILE__) . '/../resources/demond/demond.py');
+    $cmd = 'python3 ' . $path . ' --loglevel ' . log::getLogLevel('hp_printer') . ' --callback ' . network::getCallbackUrl() . ' --apikey ' . jeedom::getApiKey('hp_printer') . ' --pid ' . jeedom::getTmpFolder('hp_printer') . '/demond.pid';
+    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
+    if (is_object($cron)) {
+      $cron->stop();
+      $cron->remove();
+    }
+    $cron = new cron();
+    $cron->setClass('hp_printer');
+    $cron->setFunction('deamon_start');
+    $cron->setEnable(1);
+    $cron->setDeamon(1);
+    $cron->setSchedule('* * * * *');
+    $cron->setTimeout('15');
+    $cron->setCmd($cmd);
+    $cron->save();
+    $cron->start();
+  }
+
+  public static function deamon_stop() {
+    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
+    if (is_object($cron)) {
+      $cron->stop();
+      $cron->remove();
+    }
+    log::add('hp_printer', 'info', 'Arrêt du démon');
+  }
+
+  public static function deamon_info() {
+    $return = array('launchable' => 'nok', 'state' => 'nok', 'log' => 'nok', 'auto' => 0);
+    $cron = cron::byClassAndFunction('hp_printer', 'deamon_start');
+    if (is_object($cron)) {
+      $return['launchable'] = 'ok';
+      $return['state'] = $cron->getState();
+      $return['log'] = $cron->getLog();
+      $return['auto'] = $cron->getAuto();
+    }
+    return $return;
+  }
+  
   /*
   * Permet de déclencher une action avant modification d'une variable de configuration du plugin
   * Exemple avec la variable "param3"
@@ -97,8 +143,102 @@ class hp_printer extends eqLogic {
   public function preSave() {
   }
 
-  // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
+    // Ne créer les commandes que si l'équipement a un ID valide et qu'il n'y a pas déjà de commandes
+    if ($this->getId() == '') {
+        return;
+    }
+
+    $commands = [
+        'printer_status' => ['name' => __('Statut Imprimante', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'page_count' => ['name' => __('Compteur Pages', __FILE__), 'type' => 'info', 'subType' => 'numeric'],
+        'printer_model' => ['name' => __('Modèle Imprimante', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'serial_number' => ['name' => __('Numéro Série', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'mac_address' => ['name' => __('Adresse MAC', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'paper_tray_status' => ['name' => __('Statut Bac Papier', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'error_messages' => ['name' => __('Messages Erreur', __FILE__), 'type' => 'info', 'subType' => 'string'],
+        'network_status' => ['name' => __('Statut Réseau', __FILE__), 'type' => 'info', 'subType' => 'string'],
+    ];
+
+    foreach ($commands as $logical => $info) {
+        $cmd = $this->getCmd(null, $logical);
+        if (!is_object($cmd)) {
+            $cmd = new hp_printerCmd();
+            $cmd->setLogicalId($logical);
+            $cmd->setEqLogic_id($this->getId());
+        }
+        $cmd->setType($info['type']);
+        $cmd->setSubType($info['subType']);
+        $cmd->setName($info['name']);
+        $cmd->setIsVisible(1);
+        $cmd->setIsHistorized(1);
+        $cmd->save();
+    }
+
+    // Handle ink levels dynamically
+    $ip_address = $this->getConfiguration('ip_address');
+    if (!empty($ip_address)) {
+        $urls_to_try = [
+            "http://" . $ip_address . "/ProductConfigDyn.xml",
+            "http://" . $ip_address . "/ConsumableConfigDyn.xml"
+        ];
+
+        $html_result = false;
+        foreach ($urls_to_try as $url) {
+            $result = $this->fetchHtml($url);
+            if ($result['html'] !== false) {
+                $html_result = $result;
+                break;
+            }
+        }
+
+        if ($html_result !== false) {
+            $dom = new DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML($html_result['html']);
+            libxml_clear_errors();
+            $xpath = new DOMXPath($dom);
+
+            $inkNodes = $xpath->query("//table[@id='ink_levels_table']//tr | //div[contains(@class, 'ink-cartridge')] | //*[contains(@class, 'ink-color')]");
+            foreach ($inkNodes as $node) {
+                $color = '';
+                $level = '';
+
+                if ($node->nodeName === 'tr') {
+                    $tds = $node->getElementsByTagName('td');
+                    if ($tds->length >= 3) {
+                        $color = trim($tds->item(0)->nodeValue);
+                        if (preg_match('/(\d+)%/', $tds->item(2)->nodeValue, $matches)) {
+                            $level = $matches[1];
+                        }
+                    }
+                } else if ($node->nodeName === 'div' && $node->hasAttribute('data-color') && $node->hasAttribute('data-level')) {
+                    $color = $node->getAttribute('data-color');
+                    $level = $node->getAttribute('data-level');
+                } else if (strpos($node->getAttribute('class'), 'ink-color') !== false) {
+                    $color = trim($node->nodeValue);
+                    $percentageNode = $xpath->query("following-sibling::*[contains(@class, 'ink-percentage')]", $node);
+                    if ($percentageNode->length > 0 && preg_match('/(\d+)%/', $percentageNode->item(0)->nodeValue, $matches)) {
+                        $level = $matches[1];
+                    }
+                }
+
+                if (!empty($color) && !empty($level)) {
+                    $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
+                    $cmdName = 'ink_level_' . $logicalIdColor;
+                    $humanName = 'Niveau Encre ' . ucfirst($color);
+
+                    $cmd = $this->getCmd(null, $cmdName);
+                    if (!is_object($cmd)) {
+                        $cmd = parent::addCmd('info', $cmdName, $humanName, 'numeric', '%');
+                        $cmd->save();
+                    }
+                }
+            }
+        }
+    }
+
+    $this->pull();
   }
 
   // Fonction exécutée automatiquement avant la suppression de l'équipement
@@ -120,6 +260,26 @@ class hp_printer extends eqLogic {
   }
   */
 
+  private function fetchHtml($url) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // 5 seconds timeout for connection
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);      // 10 seconds timeout for the entire request
+    $html = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
+    curl_close($ch);
+
+    if ($http_code >= 200 && $http_code < 300) {
+        log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $url . '. HTTP status: ' . $http_code . '. HTML length: ' . strlen($html));
+        return ['html' => $html, 'http_code' => $http_code, 'curl_error' => $curl_error];
+    } else {
+        log::add('hp_printer', 'error', 'Failed to fetch HTML from ' . $url . '. HTTP status: ' . $http_code . '. cURL error: ' . $curl_error);
+        return ['html' => false, 'http_code' => $http_code, 'curl_error' => $curl_error];
+    }
+  }
+  
   public function pull() {
     log::add('hp_printer', 'debug', 'Starting pull() for equipment: ' . $this->getName());
     $ip_address = $this->getConfiguration('ip_address');
@@ -128,216 +288,159 @@ class hp_printer extends eqLogic {
       return;
     }
 
-    // The URL to fetch. This might vary between HP printer models.
-    // A common path for supplies information is /hp/device/info_supplies.html or /info_supplies.html
-    // You might need to investigate the specific printer\'s EWS to find the correct URL.
-    $url = "http://" . $ip_address . "/hp/device/info_supplies.html";
-    log::add('hp_printer', 'debug', 'Fetching data from URL: ' . $url);
+    $urls_to_try = [
+        "http://" . $ip_address . "/",
+        "http://" . $ip_address . "/ProductConfigDyn.xml",
+        "http://" . $ip_address . "/ConsumableConfigDyn.xml"
+    ];
 
-    try {
-      $html = file_get_contents($url);
-      if ($html === false) {
-        throw new Exception('Failed to fetch HTML from ' . $url);
-      }
-      log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $url . '. HTML length: ' . strlen($html));
-      // Optionally, log a truncated version of the HTML for debugging if needed
-      // log::add('hp_printer', 'debug', 'HTML content (truncated): ' . substr($html, 0, 500) . '...');
+    $html_result = false;
+    $successful_url = '';
+    foreach ($urls_to_try as $url) {
+        log::add('hp_printer', 'debug', 'Attempting to fetch data from URL: ' . $url);
+        $result = $this->fetchHtml($url);
+        if ($result['html'] !== false) {
+            $html_result = $result;
+            $successful_url = $url;
+            break;
+        }
+    }
 
-      $dom = new DOMDocument();
-      // Suppress warnings for malformed HTML, which is common in embedded web servers
-      libxml_use_internal_errors(true);
-      $dom->loadHTML($html);
-      libxml_clear_errors();
-      $xpath = new DOMXPath($dom);
+    if ($html_result === false) {
+        log::add('hp_printer', 'error', 'Failed to fetch HTML from all attempted URLs for ' . $this->getName() . '. Last attempt: HTTP status ' . $result['http_code'] . ', cURL error: ' . $result['curl_error']);
+        return;
+    }
+    
+    $html = $html_result['html'];
+    log::add('hp_printer', 'debug', 'Successfully fetched HTML from ' . $successful_url . '. HTTP status: ' . $html_result['http_code'] . '. HTML length: ' . strlen($html));
 
-      // --- Extracting Printer Status ---
-      $nodes = $xpath->query("//span[@id='hp-printer-status'] | //div[contains(text(), 'Status:')]/following-sibling::span");
-      if ($nodes->length > 0) {
-        $printerStatus = trim($nodes->item(0)->nodeValue);
+    // --- Extracting Printer Status from ProductStatusDyn.xml ---
+      $productStatusDynUrl = "http://" . $ip_address . "/DevMgmt/ProductStatusDyn.xml";
+      $productStatusDynHtml = $this->fetchHtml($productStatusDynUrl)['html'];
+      if ($productStatusDynHtml !== false && preg_match('/(inPowerSave|ready|offline)/', $productStatusDynHtml, $matches)) {
+        $printerStatus = trim($matches[1]);
         $cmd = $this->getCmd(null, 'printer_status');
         if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'printer_status', 'Statut Imprimante', 'string');
+            $cmd = parent::addCmd('info', 'printer_status', 'Statut Imprimante', 'string');
             $cmd->save();
             log::add('hp_printer', 'debug', 'Created new command: printer_status');
         }
         $cmd->execCmd($printerStatus);
         log::add('hp_printer', 'debug', 'Printer Status: ' . $printerStatus);
       } else {
-        log::add('hp_printer', 'warning', 'Could not find printer status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
+        log::add('hp_printer', 'warning', 'Could not find printer status for ' . $this->getName() . '. Please check ProductStatusDyn.xml content.');
       }
 
-      // --- Extracting Page Count ---
-      $nodes = $xpath->query("//span[@id='TotalPagesPrinted'] | //td[contains(text(), 'Total Pages:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $pageCount = (int)trim($nodes->item(0)->nodeValue);
+      // --- Extracting Page Count from ProductUsageDyn.xml ---
+      $productUsageDynUrl = "http://" . $ip_address . "/DevMgmt/ProductUsageDyn.xml";
+      $productUsageDynHtml = $this->fetchHtml($productUsageDynUrl)['html'];
+      if ($productUsageDynHtml !== false && preg_match('/SVN-IPG-LEDM\.119 \d{4}-\d{2}-\d{2} (\d+)/', $productUsageDynHtml, $matches)) {
+        $pageCount = (int)trim($matches[1]);
         $cmd = $this->getCmd(null, 'page_count');
         if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'page_count', 'Compteur Pages', 'numeric');
+            $cmd = parent::addCmd('info', 'page_count', 'Compteur Pages', 'numeric');
             $cmd->save();
             log::add('hp_printer', 'debug', 'Created new command: page_count');
         }
         $cmd->execCmd($pageCount);
         log::add('hp_printer', 'debug', 'Page Count: ' . $pageCount);
       } else {
-        log::add('hp_printer', 'warning', 'Could not find page count for ' . $this->getName() . '. Please check the HTML structure and XPath.');
+        log::add('hp_printer', 'warning', 'Could not find page count for ' . $this->getName() . '. Please check ProductUsageDyn.xml content.');
       }
 
-      // --- Extracting Printer Model ---
-      $nodes = $xpath->query("//span[@id='ProductName'] | //td[contains(text(), 'Model Name:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $printerModel = trim($nodes->item(0)->nodeValue);
+      // --- Extracting Printer Model from NetAppsDyn.xml ---
+      $netAppsDynUrl = "http://" . $ip_address . "/DevMgmt/NetAppsDyn.xml";
+      $netAppsDynHtml = $this->fetchHtml($netAppsDynUrl)['html'];
+      if ($netAppsDynHtml !== false && preg_match('/HP ENVY (\d+) series/', $netAppsDynHtml, $matches)) {
+        $printerModel = 'HP ENVY ' . trim($matches[1]) . ' series';
         $cmd = $this->getCmd(null, 'printer_model');
         if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'printer_model', 'Modèle Imprimante', 'string');
+            $cmd = parent::addCmd('info', 'printer_model', 'Modèle Imprimante', 'string');
             $cmd->save();
             log::add('hp_printer', 'debug', 'Created new command: printer_model');
         }
         $cmd->execCmd($printerModel);
         log::add('hp_printer', 'debug', 'Printer Model: ' . $printerModel);
       } else {
-        log::add('hp_printer', 'warning', 'Could not find printer model for ' . $this->getName() . '. Please check the HTML structure and XPath.');
+        log::add('hp_printer', 'warning', 'Could not find printer model for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
       }
 
-      // --- Extracting Serial Number ---
-      $nodes = $xpath->query("//span[@id='SerialNumber'] | //td[contains(text(), 'Serial Number:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $serialNumber = trim($nodes->item(0)->nodeValue);
-        $cmd = $this->getCmd(null, 'serial_number');
-        if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'serial_number', 'Numéro Série', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: serial_number');
-        }
-        $cmd->execCmd($serialNumber);
-        log::add('hp_printer', 'debug', 'Serial Number: ' . $serialNumber);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. Please check the HTML structure and XPath.');
-      }
+      // --- Extracting Serial Number (not found in provided samples, leaving as is for now) ---
+      // $serialNumber = ''; // No clear pattern in provided text
+      // log::add('hp_printer', 'warning', 'Could not find serial number for ' . $this->getName() . '. No clear pattern in provided text.');
 
-      // --- Extracting MAC Address ---
-      $nodes = $xpath->query("//span[@id='MACAddress'] | //td[contains(text(), 'MAC Address:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $macAddress = trim($nodes->item(0)->nodeValue);
+      // --- Extracting MAC Address from NetAppsDyn.xml ---
+      if ($netAppsDynHtml !== false && preg_match('/HP([0-9A-F]{12})\.local\./', $netAppsDynHtml, $matches)) {
+        $macAddress = trim($matches[1]);
         $cmd = $this->getCmd(null, 'mac_address');
         if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'mac_address', 'Adresse MAC', 'string');
+            $cmd = parent::addCmd('info', 'mac_address', 'Adresse MAC', 'string');
             $cmd->save();
             log::add('hp_printer', 'debug', 'Created new command: mac_address');
         }
         $cmd->execCmd($macAddress);
         log::add('hp_printer', 'debug', 'MAC Address: ' . $macAddress);
       } else {
-        log::add('hp_printer', 'warning', 'Could not find MAC address for ' . $this->getName() . '. Please check the HTML structure and XPath.');
+        log::add('hp_printer', 'warning', 'Could not find MAC address for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
       }
 
-      // --- Extracting Paper Tray Status ---
-      $nodes = $xpath->query("//span[@id='PaperTrayStatus'] | //div[contains(@class, 'tray-status')] | //td[contains(text(), 'Paper Tray:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $paperTrayStatus = trim($nodes->item(0)->nodeValue);
-        $cmd = $this->getCmd(null, 'paper_tray_status');
-        if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'paper_tray_status', 'Statut Bac Papier', 'string');
-            $cmd->save();
-            log::add('hp_printer', 'debug', 'Created new command: paper_tray_status');
-        }
-        $cmd->execCmd($paperTrayStatus);
-        log::add('hp_printer', 'debug', 'Paper Tray Status: ' . $paperTrayStatus);
-      } else {
-        log::add('hp_printer', 'warning', 'Could not find paper tray status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
-      }
+      // --- Extracting Paper Tray Status (not found in provided samples, leaving as is for now) ---
+      // $paperTrayStatus = ''; // No clear pattern in provided text
+      // log::add('hp_printer', 'warning', 'Could not find paper tray status for ' . $this->getName() . '. No clear pattern in provided text.');
 
-      // --- Extracting Error Messages ---
-      $nodes = $xpath->query("//div[contains(@class, 'error-message')] | //ul[@class='error-list']/li");
-      $errorMessages = [];
-      foreach ($nodes as $node) {
-        $errorMessages[] = trim($node->nodeValue);
-      }
-      $cmd = $this->getCmd(null, 'error_messages');
-      if (!is_object($cmd)) {
-          $cmd = $this->addCmd('info', 'error_messages', 'Messages Erreur', 'string');
-          $cmd->save();
-          log::add('hp_printer', 'debug', 'Created new command: error_messages');
-      }
-      $cmd->execCmd(implode(', ', $errorMessages));
-      if (!empty($errorMessages)) {
-        log::add('hp_printer', 'debug', 'Error Messages: ' . implode(', ', $errorMessages));
-      } else {
-        log::add('hp_printer', 'debug', 'No error messages found for ' . $this->getName());
-      }
+      // --- Extracting Error Messages (not found in provided samples, leaving as is for now) ---
+      // $errorMessages = []; // No clear pattern in provided text
+      // log::add('hp_printer', 'warning', 'Could not find error messages for ' . $this->getName() . '. No clear pattern in provided text.');
 
-
-      // --- Extracting Network Status ---
-      $nodes = $xpath->query("//span[@id='NetworkStatus'] | //td[contains(text(), 'Network Status:')]/following-sibling::td");
-      if ($nodes->length > 0) {
-        $networkStatus = trim($nodes->item(0)->nodeValue);
+      // --- Extracting Network Status from NetAppsDyn.xml ---
+      if ($netAppsDynHtml !== false && preg_match('/IPP (enabled|disabled)/', $netAppsDynHtml, $matches)) {
+        $networkStatus = trim($matches[1]);
         $cmd = $this->getCmd(null, 'network_status');
         if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', 'network_status', 'Statut Réseau', 'string');
+            $cmd = parent::addCmd('info', 'network_status', 'Statut Réseau', 'string');
             $cmd->save();
             log::add('hp_printer', 'debug', 'Created new command: network_status');
         }
         $cmd->execCmd($networkStatus);
         log::add('hp_printer', 'debug', 'Network Status: ' . $networkStatus);
       } else {
-        log::add('hp_printer', 'warning', 'Could not find network status for ' . $this->getName() . '. Please check the HTML structure and XPath.');
+        log::add('hp_printer', 'warning', 'Could not find network status for ' . $this->getName() . '. Please check NetAppsDyn.xml content.');
       }
 
-      // --- Extracting Ink Levels (dynamic creation and update) ---
-      $inkNodes = $xpath->query("//table[@id='ink_levels_table']//tr | //div[contains(@class, 'ink-cartridge')] | //*[contains(@class, 'ink-color')]");
-      log::add('hp_printer', 'debug', 'Found ' . $inkNodes->length . ' potential ink level nodes.');
+      // --- Extracting Ink Levels from ConsumableConfigDyn.xml ---
+      $consumableConfigDynUrl = "http://" . $ip_address . "/DevMgmt/ConsumableConfigDyn.xml";
+      $consumableConfigDynHtml = $this->fetchHtml($consumableConfigDynUrl)['html'];
+      if ($consumableConfigDynHtml !== false) {
+        // Example: "80 userReplaceable 304XL 0 inkCartridge HP 2023-11-01 4 CMYTriDots rotateZero 255 255 255 255 255 255 255 255 255 00000000000000866d75af16b89a1179 0 tenthsOfMilliliters generic class2 notSupported markingAgent TIJ2 00000000000000000000000000000000000000000000000000000000000000000883200D0000366AAFF385F495A591230014810F20BA36002081F40260244FA9 large K newGenuineHP ok HP acknowledge false false false false Eureka everyday3 50 userReplaceable 304XL 1 inkCartridge HP 2024-10-01 4 SmallCircle rotateZero 0 0 0 0 0 0 255 255 255 000000000000003557f9c3f495a59123"
+        if (preg_match_all('/(\d+) userReplaceable .*? (CMY|K)TriDots/', $consumableConfigDynHtml, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $level = $match[1];
+                $color = ($match[2] == 'CMY') ? 'color' : 'black'; // Assuming CMY is color, K is black
 
-      foreach ($inkNodes as $node) {
-        $color = '';
-        $level = '';
+                $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
+                $cmdName = 'ink_level_' . $logicalIdColor;
+                $humanName = 'Niveau Encre ' . ucfirst($color);
 
-        // Attempt to extract from table rows (Example 1)
-        if ($node->nodeName === 'tr') {
-          $tds = $node->getElementsByTagName('td');
-          if ($tds->length >= 3) {
-            $color = trim($tds->item(0)->nodeValue);
-            if (preg_match('/(\d+)%/', $tds->item(2)->nodeValue, $matches)) {
-              $level = $matches[1];
+                $cmd = $this->getCmd(null, $cmdName);
+                if (!is_object($cmd)) {
+                    $cmd = parent::addCmd('info', $cmdName, $humanName, 'numeric', '%');
+                    $cmd->save(); // Save the new command
+                    log::add('hp_printer', 'debug', 'Created new command: ' . $cmdName);
+                }
+                $cmd->execCmd((int)$level);
+                log::add('hp_printer', 'debug', 'Ink Level - ' . $humanName . ': ' . $level . '%');
             }
-          }
-        }
-        // Attempt to extract from div with data attributes (Example 2)
-        else if ($node->nodeName === 'div' && $node->hasAttribute('data-color') && $node->hasAttribute('data-level')) {
-          $color = $node->getAttribute('data-color');
-          $level = $node->getAttribute('data-level');
-        }
-        // Attempt to extract from generic elements (Example 3)
-        else if (strpos($node->getAttribute('class'), 'ink-color') !== false) {
-          $color = trim($node->nodeValue);
-          $percentageNode = $xpath->query("following-sibling::*[contains(@class, 'ink-percentage')]", $node);
-          if ($percentageNode->length > 0 && preg_match('/(\d+)%/', $percentageNode->item(0)->nodeValue, $matches)) {
-            $level = $matches[1];
-          }
-        }
-
-        if (!empty($color) && !empty($level)) {
-          // Sanitize color name for logical ID
-          $logicalIdColor = strtolower(str_replace([' ', '-', '_'], '', $color));
-          $cmdName = 'ink_level_' . $logicalIdColor;
-          $humanName = 'Niveau Encre ' . ucfirst($color);
-
-          $cmd = $this->getCmd(null, $cmdName);
-          if (!is_object($cmd)) {
-            $cmd = $this->addCmd('info', $cmdName, $humanName, 'numeric', '%');
-            $cmd->save(); // Save the new command
-            log::add('hp_printer', 'debug', 'Created new command: ' . $cmdName);
-          }
-          $cmd->execCmd((int)$level);
-          log::add('hp_printer', 'debug', 'Ink Level - ' . $humanName . ': ' . $level . '%');
         } else {
-            log::add('hp_printer', 'debug', 'Skipping ink node due to empty color or level. Color: "' . $color . '", Level: "' . $level . '"');
+            log::add('hp_printer', 'warning', 'Could not find ink levels for ' . $this->getName() . '. Please check ConsumableConfigDyn.xml content.');
         }
+      } else {
+        log::add('hp_printer', 'warning', 'Could not fetch ConsumableConfigDyn.xml for ' . $this->getName());
       }
 
       log::add('hp_printer', 'info', 'Data pulled successfully for ' . $this->getName());
 
-    } catch (Exception $e) {
-      log::add('hp_printer', 'error', 'Error pulling data for ' . $this->getName() . ': ' . $e->getMessage());
-    }
+    
+      
   }
 
   /*     * **********************Getteur Setteur*************************** */

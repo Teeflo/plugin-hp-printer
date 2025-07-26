@@ -24,5 +24,40 @@ if (!isConnect()) {
 ?>
 <form class="form-horizontal">
   <fieldset>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Adresse IP de l'imprimante}}</label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="hp_printer_ip" placeholder="192.168.1.100"/>
+      </div>
+      <div class="col-md-2">
+        <a class="btn btn-default" id="bt_testHpPrinter"><i class="fas fa-check"></i> {{Tester}}</a>
+      </div>
+    </div>
   </fieldset>
 </form>
+<script>
+$('#bt_testHpPrinter').on('click', function(){
+  var ip_address = $('.configKey[data-l1key=hp_printer_ip]').val();
+  jeedomUtils.hideAlert();
+  $.ajax({
+    type: 'POST',
+    url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+    data: {
+      action: 'test',
+      ip_address: ip_address
+    },
+    dataType: 'json',
+    error: function (request, status, error) {
+      console.error('Erreur AJAX:', request.responseText);
+      $('#div_alert').showAlert({message: '{{Erreur lors du test de connexion}} : ' + request.responseText, level: 'danger'});
+    },
+    success: function (data) {
+      if (data.state != 'ok') {
+        $('#div_alert').showAlert({message: data.result, level: 'danger'});
+      } else {
+        $('#div_alert').showAlert({message: data.result, level: 'success'});
+      }
+    }
+  });
+});
+</script>
