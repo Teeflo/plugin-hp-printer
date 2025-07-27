@@ -179,8 +179,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 			</div>
 		</div>
 	</div>
-	<?php
-	include_file('desktop', 'hp_printer', 'js', 'hp_printer');
-	include_file('core', 'plugin.template', 'js');
-	?>
+	<?php include_file('core', 'cmd', 'js');?>
+	<?php include_file('desktop', 'hp_printer', 'js', 'hp_printer');?>
+	<?php include_file('core', 'plugin.template', 'js');?>
 </div>
