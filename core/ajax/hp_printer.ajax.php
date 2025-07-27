@@ -47,13 +47,16 @@ try {
 			break;
 
 		case 'test':
+			log::add('hp_printer', 'debug', 'AJAX: Test action initiated.');
 			$ipAddress = init('ip_address');
 			if (empty($ipAddress)) {
+				log::add('hp_printer', 'error', 'AJAX: IP address is empty.');
 				ajax::success(array('state' => 'error', 'result' => __('IP address cannot be empty', __FILE__)));
 			}
 
 			// Validate IP address format
 			if (!filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+				log::add('hp_printer', 'error', 'AJAX: Invalid IP address format: ' . $ipAddress);
 				ajax::success(array('state' => 'error', 'result' => __('Invalid IP address format', __FILE__)));
 			}
 
@@ -61,16 +64,19 @@ try {
 				$protocol = init('protocol', 'http');
 				$verifySsl = init('verifySsl', 'true') === 'true';
 				$configuration = ['verifySsl' => $verifySsl];
-				// The hp_printer_connector class will be autoloaded by Jeedom when needed
+				log::add('hp_printer', 'debug', 'AJAX: Attempting connection to ' . $ipAddress . ' with protocol ' . $protocol . ' and verifySsl ' . ($verifySsl ? 'true' : 'false'));
 				$hpPrinterApi = new hp_printer_connector($ipAddress, $protocol, $configuration);
 				$testData = $hpPrinterApi->getProductConfigInfo(); // Attempt to fetch some data
 
 				if (!empty($testData)) {
+					log::add('hp_printer', 'info', 'AJAX: Connection test successful for ' . $ipAddress);
 					ajax::success(array('state' => 'ok', 'result' => __('Connection successful!', __FILE__)));
 				} else {
+					log::add('hp_printer', 'warning', 'AJAX: Connection failed or no data retrieved for ' . $ipAddress);
 					ajax::success(array('state' => 'error', 'result' => __('Connection failed or no data retrieved. Check IP address and printer status.', __FILE__)));
 				}
 			} catch (Exception $e) {
+				log::add('hp_printer', 'error', 'AJAX: Error during connection test for ' . $ipAddress . ': ' . $e->getMessage());
 				ajax::success(array('state' => 'error', 'result' => __('Error during connection test: ', __FILE__) . $e->getMessage()));
 			}
 			break;

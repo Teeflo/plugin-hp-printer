@@ -75,4 +75,14 @@ class hp_printer extends eqLogic {
         log::add('hp_printer', 'info', 'Finished data pull for eqLogic ID: ' . $this->getId());
     }
 }
+
+class hp_printerCmd extends cmd {
+    public static $_widgetPossibility = array('custom' => true);
+
+    public function execute($_options = array()) {
+        $eqLogic = $this->getEqLogic();
+        // For any command test, trigger a full data pull for the equipment
+        $eqLogic->cronPullData();
+    }
+}
 ?>

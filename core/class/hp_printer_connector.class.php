@@ -42,6 +42,7 @@ class hp_printer_connector {
      */
     private function _fetchXml($path) {
         $url = $this->protocol . "://" . $this->ipAddress . $path;
+        log::add('hp_printer', 'debug', 'Connector: Attempting to fetch XML from: ' . $url);
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -52,11 +53,13 @@ class hp_printer_connector {
             if ($verifySsl) {
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+                log::add('hp_printer', 'debug', 'Connector: SSL verification enabled.');
             } else {
                 // AVERTISSEMENT : La désactivation de la vérification SSL expose à des risques de sécurité.
                 // À n'utiliser qu'en connaissance de cause dans un environnement contrôlé.
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                log::add('hp_printer', 'warning', 'Connector: SSL verification disabled. This is not recommended for production environments.');
             }
         }
 
@@ -67,14 +70,17 @@ class hp_printer_connector {
         curl_close($ch);
 
         if ($curlErrno) {
+            log::add('hp_printer', 'error', "Connector: cURL Error ({$curlErrno}): {$curlError} for URL: {$url}");
             throw new Exception("cURL Error ({$curlErrno}): {$curlError}", 1);
         }
 
         if ($httpCode !== 200) {
+            log::add('hp_printer', 'error', "Connector: HTTP Error: Received HTTP code {$httpCode} for URL: {$url}");
             throw new Exception("HTTP Error: Received HTTP code {$httpCode}", 2);
         }
 
         if (empty($response)) {
+            log::add('hp_printer', 'error', "Connector: Empty response from printer for URL: {$url}");
             throw new Exception("Empty response from printer", 3);
         }
 
@@ -86,8 +92,10 @@ class hp_printer_connector {
                 $xmlErrors[] = trim($error->message);
             }
             libxml_clear_errors();
+            log::add('hp_printer', 'error', "Connector: Failed to parse XML from {$url}: " . implode('; ', $xmlErrors));
             throw new Exception("Failed to parse XML: " . implode('; ', $xmlErrors), 4);
         }
+        log::add('hp_printer', 'debug', 'Connector: Successfully fetched and parsed XML from: ' . $url);
         return $xml;
     }
 
