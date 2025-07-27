@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 if (!isConnect('admin')) {
 	throw new Exception(__('401 - Accès non autorisé', __FILE__));
 }
@@ -41,7 +40,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				echo '<div class="eqLogicDisplayCard cursor ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '">';
 				echo '<img src="' . $plugin->getPathImgIcon() . '">';
 				echo '<br>';
-				echo '<span class="name">' . htmlspecialchars($eqLogic->getHumanName(true, true)) . '</span>';
+				echo '<span class="name">' . $eqLogic->getName() . '</span>';
 				echo '<span class="hiddenAsCard displayTableRight hidden">';
 				if ($eqLogic->getConfiguration('autorefresh', '') != '') {
 					echo '<span class="label label-info" title="{{Fréquence de rafraîchissement des commandes}}">' . htmlspecialchars($eqLogic->getConfiguration('autorefresh')) . '</span>';
@@ -181,7 +180,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 		</div>
 	</div>
 	<?php
-	jeephp::include_file('desktop', 'hp_printer', 'js', 'hp_printer');
-	jeephp::include_file('core', 'plugin.template', 'js');
+	include_file('desktop', 'hp_printer', 'js', 'hp_printer');
+	include_file('core', 'plugin.template', 'js');
 	?>
 </div>
