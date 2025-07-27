@@ -8,16 +8,30 @@ class hp_printer_connector {
 
     private $ipAddress; // The IP address of the HP printer
     private $protocol; // The protocol to use (http or https)
+    private $configuration; // The equipment configuration
 
     /**
      * Constructor
      *
      * @param string $ipAddress The IP address of the HP printer.
      * @param string $protocol The protocol to use (http or https). Defaults to 'http'.
+     * @param array $configuration The equipment configuration.
      */
-    public function __construct($ipAddress, $protocol = 'http') {
+    public function __construct($ipAddress, $protocol = 'http', $configuration = []) {
         $this->ipAddress = $ipAddress;
         $this->protocol = $protocol;
+        $this->configuration = $configuration;
+    }
+
+    /**
+     * Get a configuration value.
+     *
+     * @param string $key The key of the configuration value.
+     * @param mixed $default The default value if the key is not found.
+     * @return mixed The configuration value.
+     */
+    private function getConfiguration($key, $default = null) {
+        return isset($this->configuration[$key]) ? $this->configuration[$key] : $default;
     }
 
     /**
@@ -34,45 +48,45 @@ class hp_printer_connector {
         curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 seconds timeout
 
         if ($this->protocol === 'https') {
-            // IMPORTANT: In a production environment, you should NEVER disable SSL verification.
-            // Instead, ensure your system has up-to-date CA certificates or specify a CA bundle.
-            // If absolutely necessary for specific environments (e.g., self-signed certs in a trusted LAN),
-            // consider making this configurable with a clear security warning in the Jeedom UI.
-            // For now, we remove the insecure options.
-            // curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // REMOVED
-            // curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // REMOVED
-
-            // Recommended: Specify a CA bundle if not relying on system defaults
-            // curl_setopt($ch, CURLOPT_CAINFO, '/path/to/your/ca-bundle.crt');
+            $verifySsl = $this->getConfiguration('verifySsl', true);
+            if ($verifySsl) {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            } else {
+                // AVERTISSEMENT : La désactivation de la vérification SSL expose à des risques de sécurité.
+                // À n'utiliser qu'en connaissance de cause dans un environnement contrôlé.
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            }
         }
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErrno = curl_errno($ch); // Get cURL error number
-        $curlError = curl_error($ch); // Get cURL error string
+        $curlErrno = curl_errno($ch);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
-        if ($httpCode !== 200 || $response === false) {
-            $logMessage = "hp_printer: Failed to fetch XML from {$url}. ";
-            if ($response === false) {
-                $logMessage .= "cURL Error ({$curlErrno}): {$curlError}. ";
-            }
-            $logMessage .= "HTTP Code: {$httpCode}.";
-            log::error($logMessage);
-            return false;
+        if ($curlErrno) {
+            throw new Exception("cURL Error ({$curlErrno}): {$curlError}", 1);
         }
 
-        // Suppress XML parsing errors to handle malformed XML gracefully
+        if ($httpCode !== 200) {
+            throw new Exception("HTTP Error: Received HTTP code {$httpCode}", 2);
+        }
+
+        if (empty($response)) {
+            throw new Exception("Empty response from printer", 3);
+        }
+
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($response);
         if ($xml === false) {
-            $errors = [];
+            $xmlErrors = [];
             foreach (libxml_get_errors() as $error) {
-                $errors[] = $error->message;
+                $xmlErrors[] = trim($error->message);
             }
             libxml_clear_errors();
-            log::error("hp_printer: Failed to parse XML from {$url}. Errors: " . implode(", ", $errors));
-            return false;
+            throw new Exception("Failed to parse XML: " . implode('; ', $xmlErrors), 4);
         }
         return $xml;
     }
@@ -96,8 +110,8 @@ class hp_printer_connector {
      */
     public function getConsumableInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/ConsumableConfigDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/ConsumableConfigDyn.xml');
             // Register namespaces for XPath queries
             $xml->registerXPathNamespace('ccdyn', 'http://www.hp.com/schemas/imaging/con/ledm/consumableconfigdyn/2007/11/19');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
@@ -119,6 +133,8 @@ class hp_printer_connector {
                 $data['consumable_' . ($index + 1) . '_cumulativeMarkingAgentUsedUnit'] = $this->_getXpathValue($consumable, './dd2:CumulativeMarkingAgentUsed/dd:Unit');
                 $data['consumable_' . ($index + 1) . '_rawPercentageLevelRemaining'] = $this->_getXpathValue($consumable, './dd:ConsumableRawPercentageLevelRemaining');
             }
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching consumable info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -130,8 +146,8 @@ class hp_printer_connector {
      */
     public function getNetworkAppInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/NetAppsDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/NetAppsDyn.xml');
             $xml->registerXPathNamespace('nadyn', 'http://www.hp.com/schemas/imaging/con/ledm/netappdyn/2009/06/24');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
@@ -149,6 +165,8 @@ class hp_printer_connector {
             $data['ippSupport'] = $this->_getXpathValue($xml, '//dd:IPPSupport');
             $data['webScan'] = $this->_getXpathValue($xml, '//nadyn:WebScan');
             $data['directPrint'] = $this->_getXpathValue($xml, '//nadyn:DirectPrint');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching network app info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -160,8 +178,8 @@ class hp_printer_connector {
      */
     public function getPrintConfigInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/PrintConfigDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/PrintConfigDyn.xml');
             $xml->registerXPathNamespace('prncfgdyn2', 'http://www.hp.com/schemas/imaging/con/ledm/printconfigdyn/2009/05/06');
             $xml->registerXPathNamespace('prncfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/printconfigdyn/2007/11/02');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
@@ -175,6 +193,8 @@ class hp_printer_connector {
             $data['printQuality'] = $this->_getXpathValue($xml, '//dd:PrintQuality');
             $data['colorLok'] = $this->_getXpathValue($xml, '//prncfgdyn:ColorLok');
             $data['inkSliders'] = $this->_getXpathValue($xml, '//prncfgdyn2:InkSliders');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching print config info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -186,8 +206,8 @@ class hp_printer_connector {
      */
     public function getProductConfigInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/ProductConfigDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/ProductConfigDyn.xml');
             $xml->registerXPathNamespace('prdcfgdyn2', 'http://www.hp.com/schemas/imaging/con/ledm/productconfigdyn/2009/03/16');
             $xml->registerXPathNamespace('prdcfgdyn', 'http://www.hp.com/schemas/imaging/con/ledm/productconfigdyn/2007/11/05');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
@@ -214,6 +234,8 @@ class hp_printer_connector {
             $data['controlPanelAccess'] = $this->_getXpathValue($xml, '//prdcfgdyn2:ProductSettings/dd:ControlPanelAccess');
             $data['availableMemoryKB'] = $this->_getXpathValue($xml, '//prdcfgdyn:Memory/dd:AvailableMemory');
             $data['totalMemoryKB'] = $this->_getXpathValue($xml, '//prdcfgdyn:Memory/dd:TotalMemory');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching product config info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -225,8 +247,8 @@ class hp_printer_connector {
      */
     public function getProductStatusInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/ProductStatusDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/ProductStatusDyn.xml');
             $xml->registerXPathNamespace('psdyn', 'http://www.hp.com/schemas/imaging/con/ledm/productstatusdyn/2007/10/31');
             $xml->registerXPathNamespace('pscat', 'http://www.hp.com/schemas/imaging/con/ledm/productstatuscategories/2007/10/31');
             $xml->registerXPathNamespace('locid', 'http://www.hp.com/schemas/imaging/con/ledm/localizationids/2007/10/31');
@@ -235,6 +257,8 @@ class hp_printer_connector {
             $data['statusCategory'] = $this->_getXpathValue($xml, '//pscat:StatusCategory');
             $data['statusStringId'] = $this->_getXpathValue($xml, '//locid:StringId');
             $data['alertTableModificationNumber'] = $this->_getXpathValue($xml, '//dd:ModificationNumber');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching product status info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -246,8 +270,8 @@ class hp_printer_connector {
      */
     public function getProductUsageInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/DevMgmt/ProductUsageDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/DevMgmt/ProductUsageDyn.xml');
             $xml->registerXPathNamespace('pudyn', 'http://www.hp.com/schemas/imaging/con/ledm/productusagedyn/2007/12/11');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd2', 'http://www.hp.com/schemas/imaging/con/dictionaries/2008/10/10');
@@ -310,6 +334,8 @@ class hp_printer_connector {
             if (!empty($betterImpressions)) {
                 $data['usage_plain_betterImpressions'] = $betterImpressions;
             }
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching product usage info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -321,8 +347,8 @@ class hp_printer_connector {
      */
     public function getIoConfigInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/IoMgmt/IoConfig.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/IoMgmt/IoConfig.xml');
             $xml->registerXPathNamespace('io', 'http://www.hp.com/schemas/imaging/con/ledm/iomgmt/2008/11/30');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
             $xml->registerXPathNamespace('dd3', 'http://www.hp.com/schemas/imaging/con/dictionaries/2009/04/06');
@@ -332,6 +358,8 @@ class hp_printer_connector {
             $data['currentHostnameConfigByMethod'] = $this->_getXpathValue($xml, '//dd:CurrentHostnameConfigByMethod');
             $data['ipv4DomainName'] = $this->_getXpathValue($xml, '//io:IPv4DomainName/dd3:DomainName');
             $data['ipv6DomainName'] = $this->_getXpathValue($xml, '//io:IPv6DomainName/dd3:DomainName');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching I/O config info: ' . $e->getMessage());
         }
         return $data;
     }
@@ -343,8 +371,8 @@ class hp_printer_connector {
      */
     public function getEPrintConfigInfo() {
         $data = [];
-        $xml = $this->_fetchXml('/ePrint/ePrintConfigDyn.xml');
-        if ($xml) {
+        try {
+            $xml = $this->_fetchXml('/ePrint/ePrintConfigDyn.xml');
             $xml->registerXPathNamespace('ep', 'http://www.hp.com/schemas/imaging/con/eprint/2010/04/30');
             $xml->registerXPathNamespace('dd', 'http://www.hp.com/schemas/imaging/con/dictionaries/1.0/');
 
@@ -355,6 +383,8 @@ class hp_printer_connector {
             $data['cloudServicesSwitchStatus'] = $this->_getXpathValue($xml, '//ep:CloudServicesSwitch/ep:Status');
             $data['registrationStepCompleted'] = $this->_getXpathValue($xml, '//ep:RegistrationDetails/ep:RegistrationStepCompleted');
             $data['platformIdentifier'] = $this->_getXpathValue($xml, '//ep:RegistrationDetails/ep:PlatformIdentifier');
+        } catch (Exception $e) {
+            log::add('hp_printer', 'error', 'Error fetching ePrint config info: ' . $e->getMessage());
         }
         return $data;
     }

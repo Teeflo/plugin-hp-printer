@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../core/php/core.inc.php';
+require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
 
 
 /**
@@ -26,56 +26,37 @@ class hp_printer extends eqLogic {
             return;
         }
 
-        $hpPrinterApi = new hp_printer_connector($ipAddress, $protocol);
+        $hpPrinterApi = new hp_printer_connector($ipAddress, $protocol, $this->getConfiguration());
 
         $allData = [];
+        $maxRetries = 3;
+        $retryDelay = 10; // seconds
 
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getConsumableInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching consumable info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $allData = array_merge($allData, $hpPrinterApi->getConsumableInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getNetworkAppInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getPrintConfigInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getProductConfigInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getProductStatusInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getProductUsageInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getIoConfigInfo());
+                $allData = array_merge($allData, $hpPrinterApi->getEPrintConfigInfo());
 
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getNetworkAppInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching network app info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
+                // If we get here, all data was fetched successfully, so we can break the loop
+                break;
 
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getPrintConfigInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching print config info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
-
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getProductConfigInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching product config info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
-
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getProductStatusInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching product status info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
-
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getProductUsageInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching product usage info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
-
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getIoConfigInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching I/O config info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
-        }
-
-        try {
-            $allData = array_merge($allData, $hpPrinterApi->getEPrintConfigInfo());
-        } catch (Exception $e) {
-            log::error('hp_printer: Error fetching ePrint config info for eqLogic ID: ' . $this->getId() . ' - ' . $e->getMessage());
+            } catch (Exception $e) {
+                log::add('hp_printer', 'warning', "Attempt {$attempt}/{$maxRetries} failed for eqLogic ID " . $this->getId() . ": " . $e->getMessage());
+                if ($attempt < $maxRetries) {
+                    sleep($retryDelay);
+                } else {
+                    log::add('hp_printer', 'error', "All {$maxRetries} attempts failed for eqLogic ID " . $this->getId() . ". Last error: " . $e->getMessage());
+                    // Optionally, set equipment to an error state here
+                    // $this->setStatus('health', '0');
+                    return; // Stop execution for this cron cycle
+                }
+            }
         }
 
         foreach ($allData as $key => $value) {

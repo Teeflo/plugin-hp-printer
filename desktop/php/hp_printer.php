@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 if (!isConnect('admin')) {
 	throw new Exception(__('401 - Accès non autorisé', __FILE__));
 }
@@ -40,10 +41,10 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				echo '<div class="eqLogicDisplayCard cursor ' . $opacity . '" data-eqLogic_id="' . $eqLogic->getId() . '">';
 				echo '<img src="' . $plugin->getPathImgIcon() . '">';
 				echo '<br>';
-				echo '<span class="name">' . $eqLogic->getHumanName(true, true) . '</span>';
+				echo '<span class="name">' . htmlspecialchars($eqLogic->getHumanName(true, true)) . '</span>';
 				echo '<span class="hiddenAsCard displayTableRight hidden">';
 				if ($eqLogic->getConfiguration('autorefresh', '') != '') {
-					echo '<span class="label label-info" title="{{Fréquence de rafraîchissement des commandes}}">' . $eqLogic->getConfiguration('autorefresh') . '</span>';
+					echo '<span class="label label-info" title="{{Fréquence de rafraîchissement des commandes}}">' . htmlspecialchars($eqLogic->getConfiguration('autorefresh')) . '</span>';
 				}
 				echo ($eqLogic->getIsVisible() == 1) ? '<i class="fas fa-eye" title="{{Equipement visible}}"></i>' : '<i class="fas fa-eye-slash" title="{{Equipement non visible}}"></i>';
 				echo '</span>';
@@ -97,6 +98,13 @@ $eqLogics = eqLogic::byType($plugin->getId());
 								</div>
 							</div>
 							<div class="form-group">
+								<label class="col-sm-4 control-label">{{Vérifier le certificat SSL}}</label>
+								<div class="col-sm-6">
+									<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="verifySsl" checked>{{Activé}}</label>
+									<span class="label label-warning">{{Attention: désactiver cette option peut rendre votre système vulnérable aux attaques de type "man-in-the-middle".}}</span>
+								</div>
+							</div>
+							<div class="form-group">
 								<label class="col-sm-4 control-label">{{Catégorie}}</label>
 								<div class="col-sm-6">
 									<?php
@@ -121,6 +129,9 @@ $eqLogics = eqLogic::byType($plugin->getId());
 								<label class="col-sm-4 control-label">{{Adresse IP}}</label>
 								<div class="col-sm-6">
 									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="ipAddress" placeholder="{{Ex: 192.168.1.10}}">
+								</div>
+								<div class="col-sm-2">
+									<a class="btn btn-primary" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester}}</a>
 								</div>
 							</div>
 							<div class="form-group">
@@ -150,6 +161,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				</form>
 			</div>
 			<div role="tabpanel" class="tab-pane" id="commandtab">
+				<a class="btn btn-success btn-sm" id="bt_refreshData"><i class="fas fa-sync"></i> {{Rafraîchir les données}}</a>
 				<br /><br />
 				<table id="table_cmd" class="table table-bordered table-condensed">
 					<thead>
@@ -169,7 +181,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 		</div>
 	</div>
 	<?php
-	include_file('desktop', 'hp_printer', 'js', 'hp_printer');
-	include_file('core', 'plugin.template', 'js');
+	jeephp::include_file('desktop', 'hp_printer', 'js', 'hp_printer');
+	jeephp::include_file('core', 'plugin.template', 'js');
 	?>
 </div>

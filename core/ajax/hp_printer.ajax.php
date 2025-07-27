@@ -1,6 +1,16 @@
 <?php
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
-include_file('core', 'hp_printer', 'class', 'hp_printer');
+
+if (init('action') == '') {
+	ajax::error('Aucune action spécifiée');
+}
+
+// Check CSRF token
+if (!jeedom::apiAccess(init('apikey'))) {
+    ajax::error('Accès non autorisé');
+}
+
+jeephp::load('hp_printer', 'class', 'core');
 
 switch (init('action')) {
     case 'pullData':
@@ -41,7 +51,9 @@ switch (init('action')) {
 
         try {
             $protocol = init('protocol', 'http');
-            $hpPrinterApi = new hp_printer_connector($ipAddress, $protocol);
+            $verifySsl = init('verifySsl', 'true') === 'true';
+            $configuration = ['verifySsl' => $verifySsl];
+            $hpPrinterApi = new hp_printer_connector($ipAddress, $protocol, $configuration);
             $testData = $hpPrinterApi->getProductConfigInfo(); // Attempt to fetch some data
 
             if (!empty($testData)) {

@@ -65,3 +65,77 @@ function addCmdToTable(_cmd) {
         }
     })
 }
+
+$('#bt_testConnection').on('click', function () {
+    var $btn = $(this);
+    $btn.prop('disabled', true).find('i').addClass('fa-spin');
+
+    var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
+    var protocol = $('.eqLogicAttr[data-l1key=configuration][data-l2key=protocol]').val();
+    var verifySsl = $('.eqLogicAttr[data-l1key=configuration][data-l2key=verifySsl]').is(':checked');
+
+    if (!ipAddress) {
+        $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
+        $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        return;
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+        data: {
+            action: 'test',
+            apikey: jeedom.getApiKeey(),
+            ip_address: ipAddress,
+            protocol: protocol,
+            verifySsl: verifySsl
+        },
+        dataType: 'json',
+        success: function (data) {
+            if (data.state === 'ok') {
+                $('#div_alert').showAlert({ message: data.result, level: 'success' });
+            } else {
+                $('#div_alert').showAlert({ message: data.result, level: 'danger' });
+            }
+        },
+        error: function (xhr, textStatus, errorThrown) {
+            $('#div_alert').showAlert({ message: '{{Erreur lors du test de connexion: ' + errorThrown + '}}', level: 'danger' });
+        },
+        complete: function () {
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        }
+    });
+});
+
+$('#bt_refreshData').on('click', function () {
+    var $btn = $(this);
+    $btn.prop('disabled', true).find('i').addClass('fa-spin');
+
+    var eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
+
+    $.ajax({
+        type: 'POST',
+        url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+        data: {
+            action: 'pullData',
+            apikey: jeedom.getApiKeey(),
+            eqLogic_id: eqLogicId
+        },
+        dataType: 'json',
+        success: function (data) {
+            if (data.state === 'ok') {
+                $('#div_alert').showAlert({ message: data.message, level: 'success' });
+                // Optionnel: rafraîchir les commandes affichées
+                // window.location.reload();
+            } else {
+                $('#div_alert').showAlert({ message: data.message, level: 'danger' });
+            }
+        },
+        error: function (xhr, textStatus, errorThrown) {
+            $('#div_alert').showAlert({ message: '{{Erreur lors du rafraîchissement: ' + errorThrown + '}}', level: 'danger' });
+        },
+        complete: function () {
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+        }
+    });
+});
