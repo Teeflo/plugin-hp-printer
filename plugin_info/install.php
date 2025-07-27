@@ -19,15 +19,15 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // Fonction exécutée automatiquement après l'installation du plugin
 function hp_printer_install() {
-    log::add('hp_printer', 'info', 'Plugin HP Printer installed successfully.');
+    log::add('hp_printer', 'info', 'hp_printer installed successfully.');
 }
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
 function hp_printer_update() {
-    log::add('hp_printer', 'info', 'Plugin HP Printer updated successfully.');
+    log::add('hp_printer', 'info', 'hp_printer updated successfully.');
 }
 
 // Fonction exécutée automatiquement après la suppression du plugin
 function hp_printer_remove() {
-    log::add('hp_printer', 'info', 'Plugin HP Printer removed successfully.');
+    log::add('hp_printer', 'info', 'hp_printer removed successfully.');
 }

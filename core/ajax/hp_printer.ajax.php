@@ -1,6 +1,6 @@
 <?php
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
-include_file('core', 'hp_printer', 'class');
+include_file('core', 'hp_printer', 'class', 'hp_printer');
 
 switch (init('action')) {
     case 'pullData':
@@ -21,7 +21,7 @@ switch (init('action')) {
         }
 
         try {
-            hp_printer::pullData($eqLogicId);
+            $eqLogic->cronPullData();
             ajax::success(array('state' => 'ok', 'message' => __('Data refreshed successfully', __FILE__)));
         } catch (Exception $e) {
             ajax::success(array('state' => 'error', 'message' => __('Error refreshing data: ', __FILE__) . $e->getMessage()));
@@ -40,10 +40,9 @@ switch (init('action')) {
         }
 
         try {
-            // Assuming 'protocol' is stored in configuration, default to 'http'
-            $protocol = init('protocol', 'http'); // Get protocol from AJAX request, default to http
-            $hpPrinter = new hp_printer($ipAddress, $protocol);
-            $testData = $hpPrinter->getProductConfigInfo(); // Attempt to fetch some data
+            $protocol = init('protocol', 'http');
+            $hpPrinterApi = new hp_printer_connector($ipAddress, $protocol);
+            $testData = $hpPrinterApi->getProductConfigInfo(); // Attempt to fetch some data
 
             if (!empty($testData)) {
                 ajax::success(array('state' => 'ok', 'result' => __('Connection successful!', __FILE__)));

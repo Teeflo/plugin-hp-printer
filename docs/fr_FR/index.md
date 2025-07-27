@@ -5,7 +5,7 @@ Ce plugin Jeedom permet de récupérer et d'afficher les informations de diverse
 La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/).
 
 Dans le détail :   
-* [Utilisation du plugin HP Printer] : Ce plugin est basé sur le plugin HP Printer Jeedom et a été adapté pour les imprimantes HP.
+* Utilisation du plugin HP Printer : Ce plugin est basé sur le plugin HP Printer Jeedom et a été adapté pour les imprimantes HP.
 
 * [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
 

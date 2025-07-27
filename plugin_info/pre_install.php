@@ -20,5 +20,5 @@ require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // Fonction exécutée automatiquement avant la mise à jour du plugin
 function hp_printer_pre_update() {
-    log::add('hp_printer', 'info', 'Plugin HP Printer pre-update hook executed.');
+    log::add('hp_printer', 'info', 'hp_printer pre-update hook executed.');
 }
