@@ -1,35 +1,40 @@
 {
 	"id": "hp_printer",
 	"name": "HP Printer",
-	"pluginVersion": "0.1",
-	"icon": "hp_printer_icon.png",
 	"description": {
-		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS)"
+		"fr_FR": "Plugin Jeedom pour récupérer et afficher les informations de diverses imprimantes HP via leur interface web embarquée (EWS).",
+		"en_US": "Jeedom plugin to retrieve and display information from various HP printers via their Embedded Web Server (EWS).",
+		"es_ES": "Plugin de Jeedom para recuperar y mostrar información de varias impresoras HP a través de su servidor web integrado (EWS).",
+		"de_DE": "Jeedom-Plugin zum Abrufen und Anzeigen von Informationen verschiedener HP-Drucker über deren eingebetteten Webserver (EWS).",
+		"it_IT": "Plugin Jeedom per recuperare e visualizzare le informazioni da varie stampanti HP tramite il loro server web incorporato (EWS).",
+		"pt_PT": "Plugin Jeedom para recuperar e exibir informações de várias impressoras HP através de seu servidor web incorporado (EWS).",
+		"ru_RU": "Плагин Jeedom для получения и отображения информации с различных принтеров HP через их встроенный веб-сервер (EWS).",
+		"ja_JP": "HPプリンターの組み込みWebサーバー（EWS）を介して情報を取得および表示するためのJeedomプラグイン。",
+		"nl_NL": "Jeedom-plugin om informatie van verschillende HP-printers op te halen en weer te geven via hun ingebouwde webserver (EWS).",
+		"tr_TR": "HP yazıcıların Gömülü Web Sunucusu (EWS) aracılığıyla bilgi almak ve görüntülemek için Jeedom eklentisi."
 	},
-	"licence": "AGPL",
+	"licence": "GPL-3.0",
 	"author": "Teeflo",
-	"require": "4.1",
+	"require": "4.0",
 	"category": "communication",
-	"hasDependency": false,
-	"hasOwnDeamon": false,
-	"maxDependancyInstallTime": 0,
-	"changelog_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/beta\/changelog",
-	"changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/changelog",
-	"documentation_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer\/beta",
-	"documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home automation\/hp_printer",
+	"version": "0.1",
+	"changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home%20automation\/hp_printer\/changelog",
+	"documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home%20automation\/hp_printer",
 	"link": {
-		"forum": "Lien vers le forum",
-		"video": "Lien vers une video"
+		"forum": "https:\/\/community.jeedom.com\/",
+		"video": ""
 	},
 	"language": [
 		"fr_FR",
 		"en_US",
 		"es_ES",
 		"de_DE",
+		"it_IT",
+		"pt_PT",
 		"ru_RU",
-		"id_ID",
-		"it_IT",		"ja_JP",
-		"pt_PT"
+		"ja_JP",
+		"nl_NL",
+		"tr_TR"
 	],
 	"compatibility": [
 		"smart",
@@ -40,7 +45,9 @@
 		"diy",
 		"mobile"
 	],
-	"commands": "plugin_info/commands.json",
+	"hasDependency": false,
+	"hasOwnDeamon": false,
+	"maxDependancyInstallTime": 0,
 	"cron": [
 		{
 			"id": "pullData",
