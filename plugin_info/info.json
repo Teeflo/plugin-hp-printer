@@ -18,10 +18,10 @@
 	"require": "4.0",
 	"category": "communication",
 	"version": "0.1",
-	"changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home%20automation\/hp_printer\/changelog",
-	"documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/home%20automation\/hp_printer",
+	"changelog": "https:\/\/github.com\/Teeflo\/plugin-hp-printer\/blob\/main\/docs\/changelog.md",
+	"documentation": "https:\/\/github.com\/Teeflo\/plugin-hp-printer\/blob\/main\/docs\/index.md",
 	"link": {
-		"forum": "https:\/\/community.jeedom.com\/",
+		"forum": "https:\/\/github.com\/Teeflo\/plugin-hp-printer\/issues",
 		"video": ""
 	},
 	"language": [

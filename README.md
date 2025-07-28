@@ -69,11 +69,11 @@ Une fois votre imprimante configurée et sauvegardée, les commandes d'informati
 
 ## 🤝 Contribution
 Les contributions sont les bienvenues ! Si vous souhaitez améliorer ce plugin, signaler un bug ou proposer de nouvelles fonctionnalités, n'hésitez pas à :
-1.  Ouvrir une issue sur le [dépôt GitHub](https://github.com/votre_utilisateur/plugin-hp-printer/issues).
+1.  Ouvrir une issue sur le [dépôt GitHub](https://github.com/Teeflo/plugin-hp-printer/issues).
 2.  Soumettre une Pull Request avec vos modifications.
 
 ## 📜 Changelog
-Consultez le [changelog](https://doc.jeedom.com/fr_FR/plugins/home%20automation/hp_printer/changelog) pour l'historique des versions et les nouvelles fonctionnalités.
+Consultez le [changelog](https://github.com/Teeflo/plugin-hp-printer/blob/main/docs/changelog.md) pour l'historique des versions et les nouvelles fonctionnalités.
 
 ## ⚖️ Licence
 Ce plugin est distribué sous la licence [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
