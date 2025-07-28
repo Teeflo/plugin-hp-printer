@@ -160,8 +160,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				</form>
 			</div>
 			<div role="tabpanel" class="tab-pane" id="commandtab">
-				<a class="btn btn-success btn-sm" id="bt_refreshData"><i class="fas fa-sync"></i> {{Rafraîchir les données}}</a>
-				<br /><br />
+				<br />
 				<table id="table_cmd" class="table table-bordered table-condensed">
 					<thead>
 						<tr>

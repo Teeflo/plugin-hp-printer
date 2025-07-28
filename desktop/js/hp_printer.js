@@ -81,22 +81,12 @@ $(function() {
             return;
         }
 
-        var apikey = '';
-        if (typeof jeedom !== 'undefined' && typeof jeedom.getApiKey === 'function') {
-            apikey = jeedom.getApiKey();
-        } else {
-            console.error("Jeedom API key function not available. Cannot proceed with AJAX call.");
-            $('#div_alert').showAlert({ message: '{{Erreur: Fonction Jeedom API key non disponible. Veuillez vider le cache de Jeedom et de votre navigateur.}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
-        }
-
+        // Test avec le fichier AJAX Jeedom simplifié
         $.ajax({
             type: 'POST',
             url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
             data: {
                 action: 'test',
-                apikey: apikey,
                 ip_address: ipAddress,
                 protocol: protocol,
                 verifySsl: verifySsl
@@ -105,12 +95,42 @@ $(function() {
             success: function (data) {
                 if (data.state === 'ok') {
                     $('#div_alert').showAlert({ message: data.result, level: 'success' });
+                } else if (data.state === 'warning') {
+                    $('#div_alert').showAlert({ message: data.result, level: 'warning' });
                 } else {
                     $('#div_alert').showAlert({ message: data.result, level: 'danger' });
                 }
+                
+                // Afficher les infos de debug si disponibles
+                if (data.debug && console && console.log) {
+                    console.log('HP Printer Test Debug:', data.debug);
+                }
             },
             error: function (xhr, textStatus, errorThrown) {
-                $('#div_alert').showAlert({ message: '{{Erreur lors du test de connexion: ' + errorThrown + '}}', level: 'danger' });
+                var errorMsg = 'Erreur lors du test de connexion: ' + errorThrown;
+                
+                // Essayer de parser la réponse pour plus de détails
+                try {
+                    var responseData = JSON.parse(xhr.responseText);
+                    if (responseData && responseData.result) {
+                        errorMsg = responseData.result;
+                    }
+                } catch (e) {
+                    // Si on ne peut pas parser, garder le message par défaut
+                }
+                
+                $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
+                
+                // Log de debug
+                if (console && console.log) {
+                    console.error('Test connection error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        textStatus: textStatus,
+                        errorThrown: errorThrown
+                    });
+                }
             },
             complete: function () {
                 $btn.prop('disabled', false).find('i').removeClass('fa-spin');
@@ -124,22 +144,11 @@ $(function() {
 
         var eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
 
-        var apikey = '';
-        if (typeof jeedom !== 'undefined' && typeof jeedom.getApiKey === 'function') {
-            apikey = jeedom.getApiKey();
-        } else {
-            console.error("Jeedom API key function not available. Cannot proceed with AJAX call.");
-            $('#div_alert').showAlert({ message: '{{Erreur: Fonction Jeedom API key non disponible. Veuillez vider le cache de Jeedom et de votre navigateur.}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
-        }
-
         $.ajax({
             type: 'POST',
             url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
             data: {
                 action: 'pullData',
-                apikey: apikey,
                 eqLogic_id: eqLogicId
             },
             dataType: 'json',
@@ -152,6 +161,74 @@ $(function() {
             },
             error: function (xhr, textStatus, errorThrown) {
                 $('#div_alert').showAlert({ message: '{{Erreur lors du rafraîchissement: ' + errorThrown + '}}', level: 'danger' });
+            },
+            complete: function () {
+                $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+            }
+        });
+    });
+
+    $('#bt_createCommands').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true).find('i').addClass('fa-spin');
+
+        var eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
+        var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
+        var protocol = $('.eqLogicAttr[data-l1key=configuration][data-l2key=protocol]').val();
+
+        if (!ipAddress) {
+            $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+            return;
+        }
+
+        if (!eqLogicId) {
+            $('#div_alert').showAlert({ message: '{{Vous devez d\'abord sauvegarder l\'équipement}}', level: 'danger' });
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+            return;
+        }
+
+        $.ajax({
+            type: 'POST',
+            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+            data: {
+                action: 'createCommands',
+                eqLogic_id: eqLogicId,
+                ip_address: ipAddress,
+                protocol: protocol
+            },
+            dataType: 'json',
+            success: function (data) {
+                if (data.state === 'ok') {
+                    $('#div_alert').showAlert({ message: data.result, level: 'success' });
+                    
+                    // Afficher les erreurs s'il y en a
+                    if (data.errors && data.errors.length > 0) {
+                        var errorMsg = '{{Quelques endpoints ont échoué:}} ' + data.errors.join(', ');
+                        $('#div_alert').showAlert({ message: errorMsg, level: 'warning' });
+                    }
+                    
+                    // Recharger la page pour afficher les nouvelles commandes
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    $('#div_alert').showAlert({ message: data.result, level: 'danger' });
+                }
+            },
+            error: function (xhr, textStatus, errorThrown) {
+                var errorMsg = 'Erreur lors de la création des commandes: ' + errorThrown;
+                
+                try {
+                    var responseData = JSON.parse(xhr.responseText);
+                    if (responseData && responseData.result) {
+                        errorMsg = responseData.result;
+                    }
+                } catch (e) {
+                    // Si on ne peut pas parser, garder le message par défaut
+                }
+                
+                $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
             },
             complete: function () {
                 $btn.prop('disabled', false).find('i').removeClass('fa-spin');
