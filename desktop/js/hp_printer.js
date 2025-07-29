@@ -80,6 +80,61 @@ $(function() {
     
     window.HP_PRINTER_GLOBALS.initialized = true;
 
+    $('#bt_testConnection').off('click').on('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var $btn = $(this);
+        if ($btn.prop('disabled') || $btn.hasClass('processing')) {
+            return false;
+        }
+
+        $btn.prop('disabled', true).addClass('processing').find('i').addClass('fa-spin');
+
+        var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
+        var protocol = $('.eqLogicAttr[data-l1key=configuration][data-l2key=protocol]').val();
+
+        if (!ipAddress) {
+            $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
+            $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
+            return false;
+        }
+
+        $.ajax({
+            type: 'POST',
+            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
+            data: {
+                action: 'testConnection',
+                ipAddress: ipAddress,
+                protocol: protocol
+            },
+            dataType: 'json',
+            cache: false,
+            success: function (data) {
+                if (data.state === 'ok') {
+                    $('#div_alert').showAlert({ message: data.result, level: 'success' });
+                } else {
+                    $('#div_alert').showAlert({ message: data.result, level: 'danger' });
+                }
+            },
+            error: function (xhr, textStatus, errorThrown) {
+                var errorMsg = '{{Erreur lors du test de connexion: }}' + errorThrown;
+                try {
+                    var responseData = JSON.parse(xhr.responseText);
+                    if (responseData && responseData.result) {
+                        errorMsg = responseData.result;
+                    }
+                } catch (e) {}
+                $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
+            },
+            complete: function () {
+                $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
+            }
+        });
+
+        return false;
+    });
+
     $('#bt_refreshData').off('click').on('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -154,15 +209,13 @@ $(function() {
             url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
             data: {
                 action: 'createCommands',
-                eqLogic_id: eqLogicId,
-                ip_address: ipAddress,
-                protocol: protocol
+                eqLogic_id: eqLogicId
             },
             dataType: 'json',
             cache: false,
             success: function (data) {
                 if (data.state === 'ok') {
-                    $('#div_alert').showAlert({ message: data.result, level: 'success' });
+                    $('#div_alert').showAlert({ message: data.message, level: 'success' });
                     
                     // Afficher les erreurs s'il y en a
                     if (data.errors && data.errors.length > 0) {
@@ -175,7 +228,7 @@ $(function() {
                         window.location.reload();
                     }, 2000);
                 } else {
-                    $('#div_alert').showAlert({ message: data.result, level: 'danger' });
+                    $('#div_alert').showAlert({ message: data.message, level: 'danger' });
                 }
             },
             error: function (xhr, textStatus, errorThrown) {
@@ -183,8 +236,8 @@ $(function() {
                 
                 try {
                     var responseData = JSON.parse(xhr.responseText);
-                    if (responseData && responseData.result) {
-                        errorMsg = responseData.result;
+                    if (responseData && responseData.message) {
+                        errorMsg = responseData.message;
                     }
                 } catch (e) {
                     // Si on ne peut pas parser, garder le message par défaut

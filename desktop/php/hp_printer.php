@@ -2,10 +2,7 @@
 if (!isConnect('admin')) {
 	throw new Exception(__('401 - Accès non autorisé', __FILE__));
 }
-$plugin = plugin::byId('hp_pr								<div class="col-sm-8">
-									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="ipAddress" placeholder="{{Ex: 192.168.1.10}}">
-								</div>
-							</div>;
+$plugin = plugin::byId('hp_printer');
 sendVarToJS('eqType', $plugin->getId());
 $eqLogics = eqLogic::byType($plugin->getId());
 ?>
@@ -126,7 +123,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="ipAddress" placeholder="{{Ex: 192.168.1.10}}">
 								</div>
 								<div class="col-sm-5">
-									<a class="btn btn-primary btn-sm" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester}}</a>
+									<a class="btn btn-primary btn-sm" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester la connexion}}</a>
 								</div>
 							</div>
 							<div class="form-group">

@@ -1,744 +1,419 @@
 [
     {
-        "id": "firmwareRevision",
-        "name": "Firmware Revision",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "firmwareRevision"
-    },
-    {
-        "id": "firmwareDate",
-        "name": "Firmware Date",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "firmwareDate"
-    },
-    {
         "id": "makeAndModel",
-        "name": "Make and Model",
+        "name": "Modèle",
         "type": "info",
         "subType": "string",
-        "logicalId": "makeAndModel"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "MakeAndModel"
     },
     {
         "id": "serialNumber",
-        "name": "Serial Number",
+        "name": "Numéro de série",
         "type": "info",
         "subType": "string",
-        "logicalId": "serialNumber"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "SerialNumber"
     },
     {
         "id": "productNumber",
-        "name": "Product Number",
+        "name": "Numéro produit",
         "type": "info",
         "subType": "string",
-        "logicalId": "productNumber"
-    },
-    {
-        "id": "passwordStatus",
-        "name": "Password Status",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "passwordStatus"
-    },
-    {
-        "id": "regionIdentifier",
-        "name": "Region Identifier",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "regionIdentifier"
-    },
-    {
-        "id": "powerSaveTimeout",
-        "name": "Power Save Timeout",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "powerSaveTimeout"
-    },
-    {
-        "id": "autoOffTime",
-        "name": "Auto Off Time",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "autoOffTime"
-    },
-    {
-        "id": "deviceLanguage",
-        "name": "Device Language",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "deviceLanguage"
-    },
-    {
-        "id": "preferredLanguage",
-        "name": "Preferred Language",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "preferredLanguage"
-    },
-    {
-        "id": "countryAndRegionName",
-        "name": "Country and Region",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "countryAndRegionName"
-    },
-    {
-        "id": "printerTimestamp",
-        "name": "Printer Timestamp",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "printerTimestamp"
-    },
-    {
-        "id": "timeFormat",
-        "name": "Time Format",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "timeFormat"
-    },
-    {
-        "id": "dateFormat",
-        "name": "Date Format",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "dateFormat"
-    },
-    {
-        "id": "quietPrintMode",
-        "name": "Quiet Print Mode",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "quietPrintMode"
-    },
-    {
-        "id": "duplex",
-        "name": "Duplex Printing",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "duplex"
-    },
-    {
-        "id": "ewsStatus",
-        "name": "EWS Status",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "ewsStatus"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "ProductNumber"
     },
     {
         "id": "deviceLocation",
-        "name": "Device Location",
+        "name": "Emplacement",
         "type": "info",
         "subType": "string",
-        "logicalId": "deviceLocation"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "DeviceLocation"
     },
     {
-        "id": "controlPanelAccess",
-        "name": "Control Panel Access",
+        "id": "passwordStatus",
+        "name": "Statut mot de passe",
         "type": "info",
         "subType": "string",
-        "logicalId": "controlPanelAccess"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "PasswordStatus"
     },
     {
-        "id": "availableMemoryKB",
-        "name": "Available Memory (KB)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "availableMemoryKB"
-    },
-    {
-        "id": "totalMemoryKB",
-        "name": "Total Memory (KB)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "totalMemoryKB"
-    },
-    {
-        "id": "statusCategory",
-        "name": "Printer Status",
+        "id": "powerSaveTimeout",
+        "name": "Délai veille",
         "type": "info",
         "subType": "string",
-        "logicalId": "statusCategory"
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "PowerSaveTimeout"
     },
     {
-        "id": "statusStringId",
-        "name": "Status String ID",
+        "id": "autoOffTime",
+        "name": "Arrêt automatique",
         "type": "info",
-        "subType": "numeric",
-        "logicalId": "statusStringId"
+        "subType": "string",
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductConfigDyn.xml",
+        "xpath": "AutoOffTime"
     },
     {
-        "id": "alertTableModificationNumber",
-        "name": "Alert Table Mod. Number",
+        "id": "cartridge_cmy_level",
+        "name": "Niveau encre couleur (CMY)",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "alertTableModificationNumber"
+        "unit": "%",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumablePercentageLevelRemaining",
+        "is_consumable": true,
+        "consumable_type": "CMY"
+    },
+    {
+        "id": "cartridge_k_level",
+        "name": "Niveau encre noire (K)",
+        "type": "info",
+        "subType": "numeric",
+        "unit": "%",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumablePercentageLevelRemaining",
+        "is_consumable": true,
+        "consumable_type": "K"
+    },
+    {
+        "id": "cartridge_cmy_state",
+        "name": "État cartouche couleur",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumableState",
+        "is_consumable": true,
+        "consumable_type": "CMY"
+    },
+    {
+        "id": "cartridge_k_state",
+        "name": "État cartouche noire",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumableState",
+        "is_consumable": true,
+        "consumable_type": "K"
+    },
+    {
+        "id": "cartridge_cmy_brand",
+        "name": "Marque cartouche couleur",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "Brand",
+        "is_consumable": true,
+        "consumable_type": "CMY"
+    },
+    {
+        "id": "cartridge_k_brand",
+        "name": "Marque cartouche noire",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "Brand",
+        "is_consumable": true,
+        "consumable_type": "K"
+    },
+    {
+        "id": "cartridgeModelCMY",
+        "name": "Modèle cartouche couleur",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumableSelectibilityNumber",
+        "is_consumable": true,
+        "consumable_type": "CMY"
+    },
+    {
+        "id": "cartridgeModelK",
+        "name": "Modèle cartouche noire",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/DevMgmt/ConsumableConfigDyn.xml",
+        "xpath": "ConsumableSelectibilityNumber",
+        "is_consumable": true,
+        "consumable_type": "K"
+    },
+    {
+        "id": "printerStatus",
+        "name": "Statut imprimante",
+        "type": "info",
+        "subType": "string",
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/DevMgmt/ProductStatusDyn.xml",
+        "xpath": "StatusCategory"
     },
     {
         "id": "totalImpressions",
-        "name": "Total Impressions",
+        "name": "Total impressions",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "totalImpressions"
-    },
-    {
-        "id": "monochromeImpressions",
-        "name": "Monochrome Impressions",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "monochromeImpressions"
+        "unit": "pages",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "TotalImpressions"
     },
     {
         "id": "colorImpressions",
-        "name": "Color Impressions",
+        "name": "Impressions couleur",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "colorImpressions"
+        "unit": "pages",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "ColorImpressions"
+    },
+    {
+        "id": "monoImpressions",
+        "name": "Impressions monochrome",
+        "type": "info",
+        "subType": "numeric",
+        "unit": "pages",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "MonochromeImpressions"
     },
     {
         "id": "simplexSheets",
-        "name": "Simplex Sheets",
+        "name": "Feuilles recto",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "simplexSheets"
+        "unit": "feuilles",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "SimplexSheets"
     },
     {
         "id": "duplexSheets",
-        "name": "Duplex Sheets",
+        "name": "Feuilles recto-verso",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "duplexSheets"
+        "unit": "feuilles",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "DuplexSheets"
     },
     {
         "id": "jamEvents",
-        "name": "Jam Events",
+        "name": "Événements bourrage",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "jamEvents"
+        "unit": "événements",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "JamEvents"
     },
     {
         "id": "mispickEvents",
-        "name": "Mispick Events",
+        "name": "Mauvaises prises papier",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "mispickEvents"
+        "unit": "événements",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "MispickEvents"
     },
     {
-        "id": "totalFrontPanelCancelPresses",
-        "name": "Front Panel Cancel Presses",
+        "id": "cumulativeInkUsed",
+        "name": "Encre utilisée (cumul)",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "totalFrontPanelCancelPresses"
+        "unit": "ml",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "ValueFloat"
     },
     {
-        "id": "cumulativeMarkingAgentUsedTotal",
-        "name": "Total Ink/Toner Used",
+        "id": "scanImages",
+        "name": "Nombre total de scans",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "cumulativeMarkingAgentUsedTotal"
+        "unit": "scans",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "ScanImages"
     },
     {
-        "id": "cumulativeMarkingAgentUsedTotalUnit",
-        "name": "Total Ink/Toner Unit",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "cumulativeMarkingAgentUsedTotalUnit"
-    },
-    {
-        "id": "ewsAccessCount",
-        "name": "EWS Access Count",
+        "id": "copyImpressions",
+        "name": "Nombre total de copies",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "ewsAccessCount"
+        "unit": "copies",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "CopyTotalImpressions"
     },
     {
         "id": "networkImpressions",
-        "name": "Network Impressions",
+        "name": "Impressions réseau",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "networkImpressions"
+        "unit": "pages",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "NetworkImpressions"
     },
     {
-        "id": "wirelessNetworkImpressions",
-        "name": "Wireless Impressions",
+        "id": "wirelessImpressions",
+        "name": "Impressions Wi-Fi",
         "type": "info",
         "subType": "numeric",
-        "logicalId": "wirelessNetworkImpressions"
-    },
-    {
-        "id": "consumable_1_markerColor",
-        "name": "Cartridge 1 Color",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_1_markerColor"
-    },
-    {
-        "id": "consumable_1_percentageLevelRemaining",
-        "name": "Cartridge 1 Level (%)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_1_percentageLevelRemaining"
-    },
-    {
-        "id": "consumable_1_selectibilityNumber",
-        "name": "Cartridge 1 Model",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_1_selectibilityNumber"
-    },
-    {
-        "id": "consumable_1_lifeState",
-        "name": "Cartridge 1 State",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_1_lifeState"
-    },
-    {
-        "id": "consumable_1_cumulativeConsumableCount",
-        "name": "Cartridge 1 Count",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_1_cumulativeConsumableCount"
-    },
-    {
-        "id": "consumable_1_cumulativeMarkingAgentUsed",
-        "name": "Cartridge 1 Used",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_1_cumulativeMarkingAgentUsed"
-    },
-    {
-        "id": "consumable_1_cumulativeMarkingAgentUsedUnit",
-        "name": "Cartridge 1 Used Unit",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_1_cumulativeMarkingAgentUsedUnit"
-    },
-    {
-        "id": "consumable_1_rawPercentageLevelRemaining",
-        "name": "Cartridge 1 Raw Level (%)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_1_rawPercentageLevelRemaining"
-    },
-    {
-        "id": "consumable_2_markerColor",
-        "name": "Cartridge 2 Color",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_2_markerColor"
-    },
-    {
-        "id": "consumable_2_percentageLevelRemaining",
-        "name": "Cartridge 2 Level (%)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_2_percentageLevelRemaining"
-    },
-    {
-        "id": "consumable_2_selectibilityNumber",
-        "name": "Cartridge 2 Model",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_2_selectibilityNumber"
-    },
-    {
-        "id": "consumable_2_lifeState",
-        "name": "Cartridge 2 State",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_2_lifeState"
-    },
-    {
-        "id": "consumable_2_cumulativeConsumableCount",
-        "name": "Cartridge 2 Count",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_2_cumulativeConsumableCount"
-    },
-    {
-        "id": "consumable_2_cumulativeMarkingAgentUsed",
-        "name": "Cartridge 2 Used",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_2_cumulativeMarkingAgentUsed"
-    },
-    {
-        "id": "consumable_2_cumulativeMarkingAgentUsedUnit",
-        "name": "Cartridge 2 Used Unit",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "consumable_2_cumulativeMarkingAgentUsedUnit"
-    },
-    {
-        "id": "consumable_2_rawPercentageLevelRemaining",
-        "name": "Cartridge 2 Raw Level (%)",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "consumable_2_rawPercentageLevelRemaining"
-    },
-    {
-        "id": "scannerTotalScanImages",
-        "name": "Total Scans",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "scannerTotalScanImages"
-    },
-    {
-        "id": "scannerFlatbedImages",
-        "name": "Flatbed Scans",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "scannerFlatbedImages"
-    },
-    {
-        "id": "copyTotalImpressions",
-        "name": "Total Copies",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "copyTotalImpressions"
-    },
-    {
-        "id": "copyColorImpressions",
-        "name": "Color Copies",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "copyColorImpressions"
-    },
-    {
-        "id": "copyMonochromeImpressions",
-        "name": "Monochrome Copies",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "copyMonochromeImpressions"
-    },
-    {
-        "id": "scanFlatbedImages",
-        "name": "Scan Flatbed Images",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "scanFlatbedImages"
-    },
-    {
-        "id": "printTotalImpressions",
-        "name": "Total Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "printTotalImpressions"
-    },
-    {
-        "id": "printPhotoImpressions",
-        "name": "Photo Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "printPhotoImpressions"
-    },
-    {
-        "id": "printCloudPrintImpressions",
-        "name": "Cloud Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "printCloudPrintImpressions"
-    },
-    {
-        "id": "usage_plain_impressions",
-        "name": "Plain Paper Usage",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "usage_plain_impressions"
-    },
-    {
-        "id": "usage_photoStandard_impressions",
-        "name": "Photo Paper Usage",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "usage_photoStandard_impressions"
-    },
-    {
-        "id": "usage_plain_normalImpressions",
-        "name": "Plain Normal Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "usage_plain_normalImpressions"
-    },
-    {
-        "id": "usage_plain_draftImpressions",
-        "name": "Plain Draft Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "usage_plain_draftImpressions"
-    },
-    {
-        "id": "usage_plain_betterImpressions",
-        "name": "Plain Better Prints",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "usage_plain_betterImpressions"
+        "unit": "pages",
+        "visible": true,
+        "historized": true,
+        "xml_source": "/DevMgmt/ProductUsageDyn.xml",
+        "xpath": "WirelessNetworkImpressions"
     },
     {
         "id": "hostname",
-        "name": "Hostname",
+        "name": "Nom d'hôte",
         "type": "info",
         "subType": "string",
-        "logicalId": "hostname"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/IoMgmt/IoConfig.xml",
+        "xpath": "Hostname"
     },
     {
         "id": "defaultHostname",
-        "name": "Default Hostname",
+        "name": "Nom d'hôte par défaut",
         "type": "info",
         "subType": "string",
-        "logicalId": "defaultHostname"
+        "unit": "",
+        "visible": false,
+        "historized": false,
+        "xml_source": "/IoMgmt/IoConfig.xml",
+        "xpath": "DefaultHostname"
     },
     {
-        "id": "currentHostnameConfigByMethod",
-        "name": "Hostname Config Method",
+        "id": "eprintEmailStatus",
+        "name": "ePrint Email",
         "type": "info",
         "subType": "string",
-        "logicalId": "currentHostnameConfigByMethod"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/ePrint/ePrintConfigDyn.xml",
+        "xpath": "EmailService"
     },
     {
-        "id": "ipv4DomainName",
-        "name": "IPv4 Domain Name",
+        "id": "eprintMobileStatus",
+        "name": "ePrint Mobile",
         "type": "info",
         "subType": "string",
-        "logicalId": "ipv4DomainName"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/ePrint/ePrintConfigDyn.xml",
+        "xpath": "MobileAppsService"
     },
     {
-        "id": "ipv6DomainName",
-        "name": "IPv6 Domain Name",
+        "id": "eprintRegistration",
+        "name": "ePrint Enregistrement",
         "type": "info",
         "subType": "string",
-        "logicalId": "ipv6DomainName"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/ePrint/ePrintConfigDyn.xml",
+        "xpath": "RegistrationState"
     },
     {
-        "id": "emailService",
-        "name": "ePrint Email Service",
+        "id": "eprintConnection",
+        "name": "ePrint Connexion",
         "type": "info",
         "subType": "string",
-        "logicalId": "emailService"
+        "unit": "",
+        "visible": true,
+        "historized": false,
+        "xml_source": "/ePrint/ePrintConfigDyn.xml",
+        "xpath": "SignalingConnectionState"
     },
     {
-        "id": "mobileAppsService",
-        "name": "ePrint Mobile Apps",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "mobileAppsService"
+        "id": "refresh",
+        "name": "Rafraîchir",
+        "type": "action",
+        "subType": "other",
+        "unit": "",
+        "visible": true,
+        "historized": false
     },
     {
-        "id": "registrationState",
-        "name": "ePrint Registration State",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "registrationState"
+        "id": "testConnection",
+        "name": "Test connexion",
+        "type": "action",
+        "subType": "other",
+        "unit": "",
+        "visible": true,
+        "historized": false
     },
     {
-        "id": "signalingConnectionState",
-        "name": "ePrint Connection State",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "signalingConnectionState"
-    },
-    {
-        "id": "cloudServicesSwitchStatus",
-        "name": "Cloud Services Status",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "cloudServicesSwitchStatus"
-    },
-    {
-        "id": "registrationStepCompleted",
-        "name": "ePrint Reg. Step",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "registrationStepCompleted"
-    },
-    {
-        "id": "platformIdentifier",
-        "name": "ePrint Platform ID",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "platformIdentifier"
-    },
-    {
-        "id": "mdnsSupport",
-        "name": "mDNS Support",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "mdnsSupport"
-    },
-    {
-        "id": "applicationServiceName",
-        "name": "Application Service Name",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "applicationServiceName"
-    },
-    {
-        "id": "domainName",
-        "name": "Domain Name",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "domainName"
-    },
-    {
-        "id": "proxySupport",
-        "name": "Proxy Support",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "proxySupport"
-    },
-    {
-        "id": "snmpSupport",
-        "name": "SNMP Support",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "snmpSupport"
-    },
-    {
-        "id": "wsDiscovery",
-        "name": "WS-Discovery",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "wsDiscovery"
-    },
-    {
-        "id": "wsPrint",
-        "name": "WS-Print",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "wsPrint"
-    },
-    {
-        "id": "wsScan",
-        "name": "WS-Scan",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "wsScan"
-    },
-    {
-        "id": "httpsRedirection",
-        "name": "HTTPS Redirection",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "httpsRedirection"
-    },
-    {
-        "id": "port9100PrintingSupport",
-        "name": "Port 9100 Printing",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "port9100PrintingSupport"
-    },
-    {
-        "id": "ippSupport",
-        "name": "IPP Support",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "ippSupport"
-    },
-    {
-        "id": "webScan",
-        "name": "Web Scan",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "webScan"
-    },
-    {
-        "id": "directPrint",
-        "name": "Direct Print",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "directPrint"
-    },
-    {
-        "id": "numOfUserReplaceableConsumables",
-        "name": "User Replaceable Cartridges",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "numOfUserReplaceableConsumables"
-    },
-    {
-        "id": "numOfNonUserReplaceableConsumables",
-        "name": "Non-User Replaceable Cartridges",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "numOfNonUserReplaceableConsumables"
-    },
-    {
-        "id": "alignmentMode",
-        "name": "Alignment Mode",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "alignmentMode"
-    },
-    {
-        "id": "singleCartridgeMode",
-        "name": "Single Cartridge Mode",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "singleCartridgeMode"
-    },
-    {
-        "id": "defaultPrintCopies",
-        "name": "Default Print Copies",
-        "type": "info",
-        "subType": "numeric",
-        "logicalId": "defaultPrintCopies"
-    },
-    {
-        "id": "defaultCourier",
-        "name": "Default Courier",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "defaultCourier"
-    },
-    {
-        "id": "defaultPdlInterpreterOrientation",
-        "name": "Default PDL Orientation",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "defaultPdlInterpreterOrientation"
-    },
-    {
-        "id": "jamRecovery",
-        "name": "Jam Recovery",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "jamRecovery"
-    },
-    {
-        "id": "resolutionSetting",
-        "name": "Resolution Setting",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "resolutionSetting"
-    },
-    {
-        "id": "borderlessPrinting",
-        "name": "Borderless Printing",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "borderlessPrinting"
-    },
-    {
-        "id": "printQuality",
-        "name": "Print Quality",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "printQuality"
-    },
-    {
-        "id": "colorLok",
-        "name": "ColorLok",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "colorLok"
-    },
-    {
-        "id": "inkSliders",
-        "name": "Ink Sliders",
-        "type": "info",
-        "subType": "string",
-        "logicalId": "inkSliders"
+        "id": "cleanHeads",
+        "name": "Nettoyage des têtes",
+        "type": "action",
+        "subType": "other",
+        "unit": "",
+        "visible": true,
+        "historized": false
     }
 ]

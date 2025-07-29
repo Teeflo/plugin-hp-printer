@@ -20,60 +20,31 @@ class hp_printer extends eqLogic {
     public function postSave() {
         log::add('hp_printer', 'info', 'Creating HP printer commands for equipment: ' . $this->getName());
 
-        // Commands based on ProductConfigDyn.xml analysis
-        $this->createCommand('makeAndModel', 'Modèle', 'info', 'string', '', true, false);
-        $this->createCommand('serialNumber', 'Numéro de série', 'info', 'string', '', true, false);
-        $this->createCommand('productNumber', 'Numéro produit', 'info', 'string', '', true, false);
-        $this->createCommand('deviceLocation', 'Emplacement', 'info', 'string', '', true, false);
-        $this->createCommand('passwordStatus', 'Statut mot de passe', 'info', 'string', '', true, false);
-        $this->createCommand('powerSaveTimeout', 'Délai veille', 'info', 'string', '', false, false);
-        $this->createCommand('autoOffTime', 'Arrêt automatique', 'info', 'string', '', false, false);
+        $commandsJsonPath = dirname(__FILE__) . '/../../plugin_info/commands.json';
+        if (!file_exists($commandsJsonPath)) {
+            log::add('hp_printer', 'error', 'commands.json not found at: ' . $commandsJsonPath);
+            return;
+        }
 
-        // Commands based on ConsumableConfigDyn.xml analysis
-        $this->createCommand('cartridge_cmy_level', 'Niveau encre couleur (CMY)', 'info', 'numeric', '%', true, true);
-        $this->createCommand('cartridge_k_level', 'Niveau encre noire (K)', 'info', 'numeric', '%', true, true);
-        $this->createCommand('cartridge_cmy_state', 'État cartouche couleur', 'info', 'string', '', true, false);
-        $this->createCommand('cartridge_k_state', 'État cartouche noire', 'info', 'string', '', true, false);
-        $this->createCommand('cartridge_cmy_brand', 'Marque cartouche couleur', 'info', 'string', '', false, false);
-        $this->createCommand('cartridge_k_brand', 'Marque cartouche noire', 'info', 'string', '', false, false);
+        $commandsData = json_decode(file_get_contents($commandsJsonPath), true);
+        if ($commandsData === null) {
+            log::add('hp_printer', 'error', 'Failed to decode commands.json');
+            return;
+        }
 
-        // Commands based on ProductStatusDyn.xml analysis
-        $this->createCommand('printerStatus', 'Statut imprimante', 'info', 'string', '', true, false);
+        foreach ($commandsData as $commandDef) {
+            $this->createCommand(
+                $commandDef['id'],
+                $commandDef['name'],
+                $commandDef['type'],
+                $commandDef['subType'],
+                $commandDef['unit'] ?? '',
+                $commandDef['visible'] ?? true,
+                $commandDef['historized'] ?? false
+            );
+        }
 
-        // NEW: Commands based on ProductUsageDyn.xml analysis (usage statistics)
-        $this->createCommand('totalImpressions', 'Total impressions', 'info', 'numeric', 'pages', true, true);
-        $this->createCommand('colorImpressions', 'Impressions couleur', 'info', 'numeric', 'pages', true, true);
-        $this->createCommand('monoImpressions', 'Impressions monochrome', 'info', 'numeric', 'pages', true, true);
-        $this->createCommand('simplexSheets', 'Feuilles recto', 'info', 'numeric', 'feuilles', true, true);
-        $this->createCommand('duplexSheets', 'Feuilles recto-verso', 'info', 'numeric', 'feuilles', true, true);
-        $this->createCommand('jamEvents', 'Événements bourrage', 'info', 'numeric', 'événements', true, true);
-        $this->createCommand('mispickEvents', 'Mauvaises prises papier', 'info', 'numeric', 'événements', true, true);
-        $this->createCommand('cumulativeInkUsed', 'Encre utilisée (cumul)', 'info', 'numeric', 'ml', true, true);
-        $this->createCommand('scanImages', 'Nombre total de scans', 'info', 'numeric', 'scans', true, true);
-        $this->createCommand('copyImpressions', 'Nombre total de copies', 'info', 'numeric', 'copies', true, true);
-        $this->createCommand('networkImpressions', 'Impressions réseau', 'info', 'numeric', 'pages', true, true);
-        $this->createCommand('wirelessImpressions', 'Impressions Wi-Fi', 'info', 'numeric', 'pages', true, true);
-
-        // NEW: Commands based on ConsumableConfigDyn.xml analysis
-        $this->createCommand('cartridgeModelCMY', 'Modèle cartouche couleur', 'info', 'string', '', false, false);
-        $this->createCommand('cartridgeModelK', 'Modèle cartouche noire', 'info', 'string', '', false, false);
-
-        // NEW: Commands based on IoConfig.xml analysis (network information)
-        $this->createCommand('hostname', 'Nom d\'hôte', 'info', 'string', '', true, false);
-        $this->createCommand('defaultHostname', 'Nom d\'hôte par défaut', 'info', 'string', '', false, false);
-
-        // NEW: Commands based on ePrintConfigDyn.xml analysis (ePrint services)
-        $this->createCommand('eprintEmailStatus', 'ePrint Email', 'info', 'string', '', true, false);
-        $this->createCommand('eprintMobileStatus', 'ePrint Mobile', 'info', 'string', '', true, false);
-        $this->createCommand('eprintRegistration', 'ePrint Enregistrement', 'info', 'string', '', true, false);
-        $this->createCommand('eprintConnection', 'ePrint Connexion', 'info', 'string', '', true, false);
-
-        // Action commands
-        $this->createCommand('refresh', 'Rafraîchir', 'action', 'other', '', true, false);
-        $this->createCommand('testConnection', 'Test connexion', 'action', 'other', '', true, false);
-        $this->createCommand('cleanHeads', 'Nettoyage des têtes', 'action', 'other', '', true, false);
-
-        log::add('hp_printer', 'info', 'HP printer commands created successfully - Total: 28 commands');
+        log::add('hp_printer', 'info', 'HP printer commands created successfully from commands.json');
     }
 
     /**
@@ -115,7 +86,6 @@ class hp_printer extends eqLogic {
         $ipAddress = $this->getConfiguration('ipAddress');
         $protocol = $this->getConfiguration('protocol', 'http');
 
-        // Debug: Log de la configuration
         log::add('hp_printer', 'info', 'Configuration - IP: ' . $ipAddress . ', Protocol: ' . $protocol);
 
         if (empty($ipAddress)) {
@@ -125,181 +95,50 @@ class hp_printer extends eqLogic {
         }
 
         try {
-            // Fetch and update data from HP printer XML endpoints
-            $this->updateFromXMLEndpoints($ipAddress, $protocol);
+            $commandsJsonPath = dirname(__FILE__) . '/../../plugin_info/commands.json';
+            $commandsData = json_decode(file_get_contents($commandsJsonPath), true);
+
+            $endpoints = [];
+            foreach ($commandsData as $commandDef) {
+                if (isset($commandDef['xml_source'])) {
+                    $endpoints[$commandDef['xml_source']][] = $commandDef;
+                }
+            }
+
+            foreach ($endpoints as $xmlSource => $cmds) {
+                $url = $protocol . "://" . $ipAddress . $xmlSource;
+                $xmlData = $this->fetchXMLData($url);
+
+                if ($xmlData !== false) {
+                    foreach ($cmds as $cmdDef) {
+                        if (isset($cmdDef['is_consumable']) && $cmdDef['is_consumable'] === true) {
+                            $this->updateConsumableCommand($xmlData, $cmdDef);
+                        } else {
+                            $value = $this->extractXMLValue($xmlData, $cmdDef['xpath']);
+                            $this->updateCommandValue($cmdDef['id'], $value);
+                        }
+                    }
+                }
+            }
+
             log::add('hp_printer', 'info', 'Data pull completed successfully for eqLogic ID: ' . $this->getId());
         } catch (Exception $e) {
             log::add('hp_printer', 'error', 'Failed to pull data for eqLogic ID ' . $this->getId() . ': ' . $e->getMessage());
         }
     }
 
-    /**
-     * Updates commands from HP printer XML endpoints
-     */
-    private function updateFromXMLEndpoints($ipAddress, $protocol) {
-        // Update product information
-        $this->updateProductConfig($ipAddress, $protocol);
-        
-        // Update consumable levels
-        $this->updateConsumableConfig($ipAddress, $protocol);
-        
-        // Update printer status
-        $this->updateProductStatus($ipAddress, $protocol);
-        
-        // NEW: Update usage statistics
-        $this->updateProductUsage($ipAddress, $protocol);
-        
-        // NEW: Update network configuration
-        $this->updateNetworkConfig($ipAddress, $protocol);
-        
-        // NEW: Update ePrint services
-        $this->updateEPrintConfig($ipAddress, $protocol);
-    }
+    private function updateConsumableCommand($xmlData, $cmdDef) {
+        $consumables = $xmlData->xpath('//*[local-name()="ConsumableInfo"]');
+        foreach ($consumables as $consumable) {
+            $labelCodeNodes = $consumable->xpath('.//*[local-name()="ConsumableLabelCode"]');
+            $labelCode = !empty($labelCodeNodes) ? (string)$labelCodeNodes[0] : '';
 
-    /**
-     * Updates product configuration data
-     */
-    private function updateProductConfig($ipAddress, $protocol) {
-        log::add('hp_printer', 'info', 'Starting product config update');
-        
-        $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductConfigDyn.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            log::add('hp_printer', 'info', 'Product config XML data retrieved successfully');
-            
-            // Extract product information with logging
-            $makeModel = $this->extractXMLValue($xmlData, 'MakeAndModel');
-            $serialNumber = $this->extractXMLValue($xmlData, 'SerialNumber');
-            
-            log::add('hp_printer', 'debug', "Extracted MakeAndModel: '$makeModel'");
-            log::add('hp_printer', 'debug', "Extracted SerialNumber: '$serialNumber'");
-            
-            $this->updateCommandValue('makeAndModel', $makeModel);
-            $this->updateCommandValue('serialNumber', $serialNumber);
-            $this->updateCommandValue('productNumber', $this->extractXMLValue($xmlData, 'ProductNumber'));
-            $this->updateCommandValue('deviceLocation', $this->extractXMLValue($xmlData, 'DeviceLocation'));
-            $this->updateCommandValue('passwordStatus', $this->extractXMLValue($xmlData, 'PasswordStatus'));
-            $this->updateCommandValue('powerSaveTimeout', $this->extractXMLValue($xmlData, 'PowerSaveTimeout'));
-            $this->updateCommandValue('autoOffTime', $this->extractXMLValue($xmlData, 'AutoOffTime'));
-            
-            log::add('hp_printer', 'info', 'Product config update completed');
-        } else {
-            log::add('hp_printer', 'error', 'Failed to retrieve product config XML data');
-        }
-    }
-
-    /**
-     * Updates consumable configuration data (ink levels)
-     */
-    private function updateConsumableConfig($ipAddress, $protocol) {
-        $url = $protocol . "://" . $ipAddress . "/DevMgmt/ConsumableConfigDyn.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            // Simplified approach: find all ConsumableInfo blocks using local-name()
-            $consumables = $xmlData->xpath('//*[local-name()="ConsumableInfo"]');
-            
-            foreach ($consumables as $consumable) {
-                // Extract data using our improved extractXMLValue function
-                $labelCodeNodes = $consumable->xpath('.//*[local-name()="ConsumableLabelCode"]');
-                $levelNodes = $consumable->xpath('.//*[local-name()="ConsumablePercentageLevelRemaining"]');
-                $stateNodes = $consumable->xpath('.//*[local-name()="ConsumableState"]');
-                $brandNodes = $consumable->xpath('.//*[local-name()="Brand"]');
-                
-                $labelCode = !empty($labelCodeNodes) ? (string)$labelCodeNodes[0] : '';
-                $level = !empty($levelNodes) ? (string)$levelNodes[0] : '';
-                $state = !empty($stateNodes) ? (string)$stateNodes[0] : '';
-                $brand = !empty($brandNodes) ? (string)$brandNodes[0] : '';
-                $modelNodes = $consumable->xpath('.//*[local-name()="ConsumableSelectibilityNumber"]');
-                $model = !empty($modelNodes) ? (string)$modelNodes[0] : '';
-                
-                if ($labelCode === 'CMY') {
-                    // Color cartridge
-                    $this->updateCommandValue('cartridge_cmy_level', $level);
-                    $this->updateCommandValue('cartridge_cmy_state', $state);
-                    $this->updateCommandValue('cartridge_cmy_brand', $brand);
-                    $this->updateCommandValue('cartridgeModelCMY', $model);
-                } elseif ($labelCode === 'K') {
-                    // Black cartridge
-                    $this->updateCommandValue('cartridge_k_level', $level);
-                    $this->updateCommandValue('cartridge_k_state', $state);
-                    $this->updateCommandValue('cartridge_k_brand', $brand);
-                    $this->updateCommandValue('cartridgeModelK', $model);
-                }
+            if ($labelCode === $cmdDef['consumable_type']) {
+                $valueNodes = $consumable->xpath('.//*[local-name()="' . $cmdDef['xpath'] . '"]');
+                $value = !empty($valueNodes) ? (string)$valueNodes[0] : '';
+                $this->updateCommandValue($cmdDef['id'], $value);
+                break;
             }
-        }
-    }
-
-    /**
-     * Updates product status data
-     */
-    private function updateProductStatus($ipAddress, $protocol) {
-        $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductStatusDyn.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            $status = $this->extractXMLValue($xmlData, 'StatusCategory');
-            $this->updateCommandValue('printerStatus', $status);
-        }
-    }
-
-    /**
-     * Updates product usage statistics from ProductUsageDyn.xml
-     */
-    private function updateProductUsage($ipAddress, $protocol) {
-        $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductUsageDyn.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            // Extract usage statistics using simplified xpath
-            $this->updateCommandValue('totalImpressions', $this->extractXMLValue($xmlData, 'TotalImpressions'));
-            $this->updateCommandValue('colorImpressions', $this->extractXMLValue($xmlData, 'ColorImpressions'));
-            $this->updateCommandValue('monoImpressions', $this->extractXMLValue($xmlData, 'MonochromeImpressions'));
-            $this->updateCommandValue('simplexSheets', $this->extractXMLValue($xmlData, 'SimplexSheets'));
-            $this->updateCommandValue('duplexSheets', $this->extractXMLValue($xmlData, 'DuplexSheets'));
-            $this->updateCommandValue('jamEvents', $this->extractXMLValue($xmlData, 'JamEvents'));
-            $this->updateCommandValue('mispickEvents', $this->extractXMLValue($xmlData, 'MispickEvents'));
-            $this->updateCommandValue('scanImages', $this->extractXMLValue($xmlData, 'ScanImages'));
-            $this->updateCommandValue('copyImpressions', $this->extractXMLValue($xmlData, 'CopyTotalImpressions'));
-            $this->updateCommandValue('networkImpressions', $this->extractXMLValue($xmlData, 'NetworkImpressions'));
-            $this->updateCommandValue('wirelessImpressions', $this->extractXMLValue($xmlData, 'WirelessNetworkImpressions'));
-            
-            // Extract cumulative ink usage - look for ValueFloat elements
-            $inkUsageNodes = $xmlData->xpath('//*[local-name()="ValueFloat"]');
-            if (!empty($inkUsageNodes)) {
-                $this->updateCommandValue('cumulativeInkUsed', (string)$inkUsageNodes[0]);
-            }
-        }
-    }
-
-    /**
-     * Updates network configuration from IoConfig.xml
-     */
-    private function updateNetworkConfig($ipAddress, $protocol) {
-        $url = $protocol . "://" . $ipAddress . "/IoMgmt/IoConfig.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            // Extract network information
-            $this->updateCommandValue('hostname', $this->extractXMLValue($xmlData, 'Hostname'));
-            $this->updateCommandValue('defaultHostname', $this->extractXMLValue($xmlData, 'DefaultHostname'));
-        }
-    }
-
-    /**
-     * Updates ePrint services configuration from ePrintConfigDyn.xml
-     */
-    private function updateEPrintConfig($ipAddress, $protocol) {
-        $url = $protocol . "://" . $ipAddress . "/ePrint/ePrintConfigDyn.xml";
-        $xmlData = $this->fetchXMLData($url);
-        
-        if ($xmlData !== false) {
-            // Extract ePrint service status
-            $this->updateCommandValue('eprintEmailStatus', $this->extractXMLValue($xmlData, 'EmailService'));
-            $this->updateCommandValue('eprintMobileStatus', $this->extractXMLValue($xmlData, 'MobileAppsService'));
-            $this->updateCommandValue('eprintRegistration', $this->extractXMLValue($xmlData, 'RegistrationState'));
-            $this->updateCommandValue('eprintConnection', $this->extractXMLValue($xmlData, 'SignalingConnectionState'));
         }
     }
 
@@ -418,8 +257,6 @@ class hp_printer extends eqLogic {
             } else {
                 log::add('hp_printer', 'error', "Command '$logicalId' not found - cannot update value");
             }
-        } else {
-            log::add('hp_printer', 'warning', "Empty value for command '$logicalId' - skipping update");
         }
     }
 }
@@ -445,9 +282,10 @@ class hp_printerCmd extends cmd {
         try {
             switch ($this->getLogicalId()) {
                 case 'refresh':
-                    // Trigger a full data pull for the equipment
                     $eqLogic->cronPullData();
                     break;
+
+                case 'testConnection':                    // Test the connection and return a success or error message                    $ipAddress = $eqLogic->getConfiguration('ipAddress');                    if (empty($ipAddress)) {                        throw new Exception(__('L'adresse IP n'est pas configurée pour le test de connexion.', __FILE__));                    }                    $protocol = $eqLogic->getConfiguration('protocol', 'http');                    $url = $protocol . '://' . $ipAddress;                    $ch = curl_init();                    curl_setopt_array($ch, [                        CURLOPT_URL => $url,                        CURLOPT_RETURNTRANSFER => true,                        CURLOPT_TIMEOUT => 5,                        CURLOPT_CONNECTTIMEOUT => 3,                        CURLOPT_SSL_VERIFYPEER => false,                        CURLOPT_SSL_VERIFYHOST => false,                        CURLOPT_NOBODY => true                    ]);                    curl_exec($ch);                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);                    $curlErrno = curl_errno($ch);                    curl_close($ch);                    if ($curlErrno !== 0 || $httpCode >= 400) {                        throw new Exception(__('La connexion à l'imprimante a échoué. Vérifiez l'adresse IP et que l'imprimante est en ligne.', __FILE__));                    } else {                        // La connexion est réussie, pas besoin de renvoyer de message ici                        // Le message de succès est géré côté JS                    }                    break;
 
                 case 'cleanHeads':
                     // Start a cleaning cycle
