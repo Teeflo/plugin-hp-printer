@@ -131,9 +131,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 								</div>
 								<div class="col-sm-5">
 									<a class="btn btn-primary btn-sm" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester}}</a>
-									<a class="btn btn-warning btn-sm" id="bt_debugTest"><i class="fas fa-bug"></i> {{Debug}}</a>
-									<a class="btn btn-info btn-sm" id="bt_simpleTest"><i class="fas fa-tools"></i> {{Diagnostic}}</a>
-									<a class="btn btn-success btn-sm" id="bt_testHttpsNoSsl"><i class="fas fa-shield-alt"></i> {{HTTPS Test}}</a>
 								</div>
 							</div>
 							<div class="form-group">

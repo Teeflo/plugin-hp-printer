@@ -67,157 +67,6 @@ function addCmdToTable(_cmd) {
 }
 
 $(function() {
-    // Fonction de test de débogage
-    $('#bt_debugTest').on('click', function () {
-        var $btn = $(this);
-        $btn.prop('disabled', true);
-        
-        $.ajax({
-            type: 'POST',
-            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
-            data: {
-                action: 'debug'
-            },
-            dataType: 'json',
-            success: function (data) {
-                if (data.state === 'ok') {
-                    $('#div_alert').showAlert({ 
-                        message: 'Debug OK: ' + data.result, 
-                        level: 'success' 
-                    });
-                } else {
-                    $('#div_alert').showAlert({ 
-                        message: 'Debug Erreur: ' + data.result, 
-                        level: 'danger' 
-                    });
-                }
-                console.log('Debug test result:', data);
-            },
-            error: function (xhr, textStatus, errorThrown) {
-                var errorMsg = 'Erreur debug AJAX: ';
-                
-                if (xhr.responseText) {
-                    try {
-                        var responseData = JSON.parse(xhr.responseText);
-                        if (responseData && responseData.result) {
-                            errorMsg += responseData.result;
-                        } else {
-                            errorMsg += xhr.responseText.substring(0, 200);
-                        }
-                    } catch (e) {
-                        errorMsg += xhr.responseText.substring(0, 200);
-                    }
-                } else {
-                    errorMsg += textStatus + ' - ' + errorThrown;
-                }
-                
-                $('#div_alert').showAlert({ 
-                    message: errorMsg, 
-                    level: 'danger' 
-                });
-                console.error('Debug test error:', {
-                    status: xhr.status,
-                    responseText: xhr.responseText,
-                    textStatus: textStatus,
-                    errorThrown: errorThrown
-                });
-            },
-            complete: function () {
-                $btn.prop('disabled', false);
-            }
-        });
-    });
-
-    // Fonction de diagnostic simple (sans dépendance Jeedom)
-    $('#bt_simpleTest').on('click', function () {
-        var $btn = $(this);
-        $btn.prop('disabled', true);
-        
-        $.ajax({
-            type: 'GET',
-            url: 'plugins/hp_printer/core/php/simple_diagnostic.php',
-            dataType: 'json',
-            success: function (data) {
-                var level = data.status === 'success' ? 'success' : (data.status === 'warning' ? 'warning' : 'danger');
-                $('#div_alert').showAlert({ 
-                    message: 'Diagnostic: ' + data.message + ' (Détails dans la console)', 
-                    level: level
-                });
-                console.log('Simple diagnostic result:', data);
-            },
-            error: function (xhr, textStatus, errorThrown) {
-                $('#div_alert').showAlert({ 
-                    message: 'Erreur diagnostic: ' + textStatus + ' - ' + errorThrown + ' (Détails dans la console)', 
-                    level: 'danger' 
-                });
-                console.error('Simple diagnostic error:', {
-                    status: xhr.status,
-                    responseText: xhr.responseText,
-                    textStatus: textStatus,
-                    errorThrown: errorThrown
-                });
-            },
-            complete: function () {
-                $btn.prop('disabled', false);
-            }
-        });
-    });
-
-    // Test HTTPS forcé sans SSL
-    $('#bt_testHttpsNoSsl').on('click', function () {
-        var $btn = $(this);
-        $btn.prop('disabled', true).find('i').addClass('fa-spin');
-
-        var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
-
-        if (!ipAddress) {
-            $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
-        }
-
-        console.log('Test HTTPS sans SSL pour:', ipAddress);
-
-        $.ajax({
-            type: 'POST',
-            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
-            data: {
-                action: 'testHttpsNoSsl',
-                ip_address: ipAddress
-            },
-            dataType: 'json',
-            success: function (data) {
-                if (data.state === 'ok') {
-                    $('#div_alert').showAlert({ message: data.result, level: 'success' });
-                } else {
-                    $('#div_alert').showAlert({ message: data.result, level: 'danger' });
-                }
-            },
-            error: function (xhr, textStatus, errorThrown) {
-                var errorMsg = 'Erreur test HTTPS';
-                
-                if (xhr.responseText) {
-                    try {
-                        var responseData = JSON.parse(xhr.responseText);
-                        if (responseData && responseData.result) {
-                            errorMsg = responseData.result;
-                        }
-                    } catch (e) {
-                        errorMsg += ': ' + xhr.responseText.substring(0, 200);
-                    }
-                } else {
-                    errorMsg += ': ' + textStatus + ' - ' + errorThrown;
-                }
-                
-                $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
-                console.error('HTTPS test error:', xhr);
-            },
-            complete: function () {
-                $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            }
-        });
-    });
-
     $('#bt_testConnection').on('click', function () {
         var $btn = $(this);
         $btn.prop('disabled', true).find('i').addClass('fa-spin');
@@ -225,14 +74,6 @@ $(function() {
         var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
         var protocol = $('.eqLogicAttr[data-l1key=configuration][data-l2key=protocol]').val();
         var verifySsl = $('.eqLogicAttr[data-l1key=configuration][data-l2key=verifySsl]').is(':checked');
-
-        // Debug: afficher les paramètres dans la console
-        console.log('Test parameters:', {
-            ipAddress: ipAddress,
-            protocol: protocol,
-            verifySsl: verifySsl,
-            verifySslString: verifySsl ? 'true' : 'false'
-        });
 
         if (!ipAddress) {
             $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
@@ -259,11 +100,6 @@ $(function() {
                     $('#div_alert').showAlert({ message: data.result, level: 'warning' });
                 } else {
                     $('#div_alert').showAlert({ message: data.result, level: 'danger' });
-                }
-                
-                // Afficher les infos de debug si disponibles
-                if (data.debug && console && console.log) {
-                    console.log('HP Printer Test Debug:', data.debug);
                 }
             },
             error: function (xhr, textStatus, errorThrown) {
@@ -296,17 +132,6 @@ $(function() {
                 }
                 
                 $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
-                
-                // Log de debug complet
-                if (console && console.error) {
-                    console.error('Test connection error details:', {
-                        status: xhr.status,
-                        statusText: xhr.statusText,
-                        responseText: xhr.responseText ? xhr.responseText.substring(0, 500) : 'No response',
-                        textStatus: textStatus,
-                        errorThrown: errorThrown
-                    });
-                }
             },
             complete: function () {
                 $btn.prop('disabled', false).find('i').removeClass('fa-spin');
