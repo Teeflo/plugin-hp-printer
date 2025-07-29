@@ -11,7 +11,8 @@ Ce document retrace les modifications et les nouvelles fonctionnalités apporté
     *   Ajout de la commande d'action "Nettoyage des têtes".
     *   Amélioration de l'extraction des données XML pour une meilleure compatibilité avec différents modèles d'imprimantes.
 *   **Améliorations :**
-    *   Internationalisation complète du plugin (fr_FR, en_US, es_ES, de_DE, it_IT, pt_PT, ru_RU, ja_JP, nl_NL, tr_TR).
+    *   Internationalisation complète du plugin (fr_FR, en_US, es_ES, de_DE, it_IT, pt_PT, ru_RU, ja_JP, nl_NL, tr_TR, id_ID).
+    *   Ajout de la traduction indonésienne (id_ID).
     *   Ajout de la traduction néerlandaise (nl_NL).
     *   Mise à jour du `README.md` avec une documentation plus détaillée.
     *   Optimisation du fichier `info.json` avec des métadonnées complètes et des descriptions multilingues.

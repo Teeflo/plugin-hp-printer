@@ -66,82 +66,31 @@ function addCmdToTable(_cmd) {
     })
 }
 
+// Variable globale pour empêcher les exécutions multiples - avec namespace unique
+window.HP_PRINTER_GLOBALS = window.HP_PRINTER_GLOBALS || {
+    initialized: false
+};
+
 $(function() {
-    $('#bt_testConnection').on('click', function () {
+    // Empêcher l'initialisation multiple
+    if (window.HP_PRINTER_GLOBALS.initialized) {
+        console.log('HP Printer déjà initialisé, ignoré');
+        return;
+    }
+    
+    window.HP_PRINTER_GLOBALS.initialized = true;
+
+    $('#bt_refreshData').off('click').on('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         var $btn = $(this);
-        $btn.prop('disabled', true).find('i').addClass('fa-spin');
-
-        var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
-        var protocol = $('.eqLogicAttr[data-l1key=configuration][data-l2key=protocol]').val();
-        var verifySsl = $('.eqLogicAttr[data-l1key=configuration][data-l2key=verifySsl]').is(':checked');
-
-        if (!ipAddress) {
-            $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
+        
+        if ($btn.prop('disabled') || $btn.hasClass('processing')) {
+            return false;
         }
-
-        // Test avec le fichier AJAX Jeedom
-        $.ajax({
-            type: 'POST',
-            url: 'plugins/hp_printer/core/ajax/hp_printer.ajax.php',
-            data: {
-                action: 'test',
-                ip_address: ipAddress,
-                protocol: protocol || 'http',
-                verifySsl: verifySsl ? 'true' : 'false'
-            },
-            dataType: 'json',
-            global: false,
-            success: function (data) {
-                if (data.state === 'ok') {
-                    $('#div_alert').showAlert({ message: data.result, level: 'success' });
-                } else if (data.state === 'warning') {
-                    $('#div_alert').showAlert({ message: data.result, level: 'warning' });
-                } else {
-                    $('#div_alert').showAlert({ message: data.result, level: 'danger' });
-                }
-            },
-            error: function (xhr, textStatus, errorThrown) {
-                var errorMsg = 'Erreur lors du test de connexion';
-                
-                // Essayer de parser la réponse pour plus de détails
-                if (xhr.responseText) {
-                    try {
-                        var responseData = JSON.parse(xhr.responseText);
-                        if (responseData && responseData.result) {
-                            errorMsg = responseData.result;
-                        }
-                    } catch (e) {
-                        // Chercher un message d'erreur dans le HTML de réponse
-                        var htmlMatch = xhr.responseText.match(/<title[^>]*>(.*?)<\/title>/i);
-                        if (htmlMatch && htmlMatch[1]) {
-                            errorMsg += ': ' + htmlMatch[1];
-                        } else if (xhr.responseText.indexOf('Parse error') !== -1) {
-                            errorMsg += ': Erreur de syntaxe PHP';
-                        } else if (xhr.responseText.indexOf('Fatal error') !== -1) {
-                            errorMsg += ': Erreur fatale PHP';
-                        } else if (xhr.status) {
-                            errorMsg += ': HTTP ' + xhr.status + ' ' + xhr.statusText;
-                        }
-                    }
-                } else if (xhr.status) {
-                    errorMsg += ': HTTP ' + xhr.status + ' ' + xhr.statusText;
-                } else if (errorThrown) {
-                    errorMsg += ': ' + errorThrown;
-                }
-                
-                $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
-            },
-            complete: function () {
-                $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            }
-        });
-    });
-
-    $('#bt_refreshData').on('click', function () {
-        var $btn = $(this);
-        $btn.prop('disabled', true).find('i').addClass('fa-spin');
+        
+        $btn.prop('disabled', true).addClass('processing').find('i').addClass('fa-spin');
 
         var eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
 
@@ -153,6 +102,7 @@ $(function() {
                 eqLogic_id: eqLogicId
             },
             dataType: 'json',
+            cache: false,
             success: function (data) {
                 if (data.state === 'ok') {
                     $('#div_alert').showAlert({ message: data.message, level: 'success' });
@@ -164,14 +114,24 @@ $(function() {
                 $('#div_alert').showAlert({ message: '{{Erreur lors du rafraîchissement: ' + errorThrown + '}}', level: 'danger' });
             },
             complete: function () {
-                $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+                $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
             }
         });
+        
+        return false;
     });
 
-    $('#bt_createCommands').on('click', function () {
+    $('#bt_createCommands').off('click').on('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         var $btn = $(this);
-        $btn.prop('disabled', true).find('i').addClass('fa-spin');
+        
+        if ($btn.prop('disabled') || $btn.hasClass('processing')) {
+            return false;
+        }
+        
+        $btn.prop('disabled', true).addClass('processing').find('i').addClass('fa-spin');
 
         var eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
         var ipAddress = $('.eqLogicAttr[data-l1key=configuration][data-l2key=ipAddress]').val();
@@ -179,14 +139,14 @@ $(function() {
 
         if (!ipAddress) {
             $('#div_alert').showAlert({ message: '{{L\'adresse IP est requise}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
+            $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
+            return false;
         }
 
         if (!eqLogicId) {
             $('#div_alert').showAlert({ message: '{{Vous devez d\'abord sauvegarder l\'équipement}}', level: 'danger' });
-            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
-            return;
+            $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
+            return false;
         }
 
         $.ajax({
@@ -199,6 +159,7 @@ $(function() {
                 protocol: protocol
             },
             dataType: 'json',
+            cache: false,
             success: function (data) {
                 if (data.state === 'ok') {
                     $('#div_alert').showAlert({ message: data.result, level: 'success' });
@@ -232,8 +193,10 @@ $(function() {
                 $('#div_alert').showAlert({ message: errorMsg, level: 'danger' });
             },
             complete: function () {
-                $btn.prop('disabled', false).find('i').removeClass('fa-spin');
+                $btn.prop('disabled', false).removeClass('processing').find('i').removeClass('fa-spin');
             }
         });
+        
+        return false;
     });
 });

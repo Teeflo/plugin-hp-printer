@@ -2,7 +2,10 @@
 if (!isConnect('admin')) {
 	throw new Exception(__('401 - Accès non autorisé', __FILE__));
 }
-$plugin = plugin::byId('hp_printer');
+$plugin = plugin::byId('hp_pr								<div class="col-sm-8">
+									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="ipAddress" placeholder="{{Ex: 192.168.1.10}}">
+								</div>
+							</div>;
 sendVarToJS('eqType', $plugin->getId());
 $eqLogics = eqLogic::byType($plugin->getId());
 ?>
@@ -94,13 +97,6 @@ $eqLogics = eqLogic::byType($plugin->getId());
 										echo $options;
 										?>
 									</select>
-								</div>
-							</div>
-							<div class="form-group">
-								<label class="col-sm-4 control-label">{{Vérifier le certificat SSL}}</label>
-								<div class="col-sm-6">
-									<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="verifySsl">{{Activé}}</label>
-									<span class="label label-info">{{Recommandé: Laissez décoché pour les imprimantes HP (certificats auto-signés)}}</span>
 								</div>
 							</div>
 							<div class="form-group">

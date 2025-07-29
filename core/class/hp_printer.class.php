@@ -94,6 +94,14 @@ class hp_printer extends eqLogic {
         $cmd->setIsVisible($visible ? 1 : 0);
         $cmd->setIsHistorized($historized ? 1 : 0);
         
+        // Désactiver le bouton test pour les commandes info car elles ne sont pas exécutables
+        if ($type === 'info') {
+            $cmd->setDisplay('showNameOn', 1);
+            $cmd->setDisplay('showStatOn', 1);
+            // Cache le bouton de test pour les commandes info
+            $cmd->setConfiguration('actionCheckCmd', '');
+        }
+        
         $cmd->save();
     }
 
@@ -421,6 +429,12 @@ class hp_printerCmd extends cmd {
     private static $isExecuting = false;
 
     public function execute($_options = array()) {
+        // Protection: ne pas exécuter les commandes de type 'info'
+        if ($this->getType() === 'info') {
+            log::add('hp_printer', 'warning', 'Tentative d\'exécution d\'une commande info: ' . $this->getName() . ' (ID: ' . $this->getLogicalId() . ')');
+            throw new Exception(__('Les commandes de type information ne peuvent pas être exécutées.', __FILE__));
+        }
+        
         if (self::$isExecuting) {
             return;
         }
@@ -433,46 +447,6 @@ class hp_printerCmd extends cmd {
                 case 'refresh':
                     // Trigger a full data pull for the equipment
                     $eqLogic->cronPullData();
-                    break;
-                    
-                case 'testConnection':
-                    // Test connection to the printer
-                    $ipAddress = $eqLogic->getConfiguration('ipAddress');
-                    $protocol = $eqLogic->getConfiguration('protocol', 'http');
-                    
-                    if (empty($ipAddress)) {
-                        log::add('hp_printer', 'error', 'IP address not configured for connection test');
-                        jeedom::message(array('message' => __('L\'adresse IP n\'est pas configurée pour le test de connexion.', __FILE__), 'type' => 'error'));
-                        self::$isExecuting = false;
-                        return;
-                    }
-                    
-                    $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductConfigDyn.xml";
-                    $ch = curl_init();
-                    curl_setopt_array($ch, [
-                        CURLOPT_URL => $url,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 5,
-                        CURLOPT_CONNECTTIMEOUT => 5,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_SSL_VERIFYHOST => false,
-                        CURLOPT_FOLLOWLOCATION => false,
-                        CURLOPT_USERAGENT => 'Jeedom HP Printer Test'
-                    ]);
-                    
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $curlErrno = curl_errno($ch);
-                    $curlError = curl_error($ch);
-                    curl_close($ch);
-                    
-                    if ($curlErrno || $httpCode !== 200) {
-                        log::add('hp_printer', 'warning', 'Connection test failed for ' . $ipAddress . ' - HTTP: ' . $httpCode . ' - cURL Error: ' . $curlError);
-                        jeedom::message(array('message' => __('La connexion à l\'imprimante a échoué. Vérifiez l\'adresse IP et que l\'imprimante est en ligne.', __FILE__), 'type' => 'error'));
-                    } else {
-                        log::add('hp_printer', 'info', 'Connection test successful for ' . $ipAddress);
-                        jeedom::message(array('message' => __('La connexion à l\'imprimante est réussie.', __FILE__), 'type' => 'success'));
-                    }
                     break;
 
                 case 'cleanHeads':
