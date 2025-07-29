@@ -99,8 +99,8 @@ $eqLogics = eqLogic::byType($plugin->getId());
 							<div class="form-group">
 								<label class="col-sm-4 control-label">{{Vérifier le certificat SSL}}</label>
 								<div class="col-sm-6">
-									<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="verifySsl" checked>{{Activé}}</label>
-									<span class="label label-warning">{{Attention: désactiver cette option peut rendre votre système vulnérable aux attaques de type "man-in-the-middle".}}</span>
+									<label class="checkbox-inline"><input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="verifySsl">{{Activé}}</label>
+									<span class="label label-info">{{Recommandé: Laissez décoché pour les imprimantes HP (certificats auto-signés)}}</span>
 								</div>
 							</div>
 							<div class="form-group">
@@ -126,11 +126,14 @@ $eqLogics = eqLogic::byType($plugin->getId());
 							<legend><i class="fas fa-cogs"></i> {{Paramètres spécifiques}}</legend>
 							<div class="form-group">
 								<label class="col-sm-4 control-label">{{Adresse IP}}</label>
-								<div class="col-sm-6">
+								<div class="col-sm-3">
 									<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="ipAddress" placeholder="{{Ex: 192.168.1.10}}">
 								</div>
-								<div class="col-sm-2">
-									<a class="btn btn-primary" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester}}</a>
+								<div class="col-sm-5">
+									<a class="btn btn-primary btn-sm" id="bt_testConnection"><i class="fas fa-check"></i> {{Tester}}</a>
+									<a class="btn btn-warning btn-sm" id="bt_debugTest"><i class="fas fa-bug"></i> {{Debug}}</a>
+									<a class="btn btn-info btn-sm" id="bt_simpleTest"><i class="fas fa-tools"></i> {{Diagnostic}}</a>
+									<a class="btn btn-success btn-sm" id="bt_testHttpsNoSsl"><i class="fas fa-shield-alt"></i> {{HTTPS Test}}</a>
 								</div>
 							</div>
 							<div class="form-group">

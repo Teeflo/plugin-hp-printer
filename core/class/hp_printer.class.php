@@ -418,79 +418,89 @@ class hp_printer extends eqLogic {
 
 class hp_printerCmd extends cmd {
     public static $_widgetPossibility = array('custom' => true);
+    private static $isExecuting = false;
 
     public function execute($_options = array()) {
+        if (self::$isExecuting) {
+            return;
+        }
+
+        self::$isExecuting = true;
         $eqLogic = $this->getEqLogic();
         
-        switch ($this->getLogicalId()) {
-            case 'refresh':
-                // Trigger a full data pull for the equipment
-                $eqLogic->cronPullData();
-                break;
-                
-            case 'testConnection':
-                // Test connection to the printer
-                $ipAddress = $eqLogic->getConfiguration('ipAddress');
-                $protocol = $eqLogic->getConfiguration('protocol', 'http');
-                
-                if (empty($ipAddress)) {
-                    log::add('hp_printer', 'error', 'IP address not configured for connection test');
-                    jeedom::message(array('message' => __('L\'adresse IP n\'est pas configurée pour le test de connexion.', __FILE__), 'type' => 'error'));
-                    return;
-                }
-                
-                $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductConfigDyn.xml";
-                $ch = curl_init();
-                curl_setopt_array($ch, [
-                    CURLOPT_URL => $url,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 5,
-                    CURLOPT_CONNECTTIMEOUT => 5,
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => false,
-                    CURLOPT_FOLLOWLOCATION => false,
-                    CURLOPT_USERAGENT => 'Jeedom HP Printer Test'
-                ]);
-                
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $curlErrno = curl_errno($ch);
-                $curlError = curl_error($ch);
-                curl_close($ch);
-                
-                if ($curlErrno || $httpCode !== 200) {
-                    log::add('hp_printer', 'warning', 'Connection test failed for ' . $ipAddress . ' - HTTP: ' . $httpCode . ' - cURL Error: ' . $curlError);
-                    jeedom::message(array('message' => __('La connexion à l\'imprimante a échoué. Vérifiez l\'adresse IP et que l\'imprimante est en ligne.', __FILE__), 'type' => 'error'));
-                } else {
-                    log::add('hp_printer', 'info', 'Connection test successful for ' . $ipAddress);
-                    jeedom::message(array('message' => __('La connexion à l\'imprimante est réussie.', __FILE__), 'type' => 'success'));
-                }
-                break;
+        try {
+            switch ($this->getLogicalId()) {
+                case 'refresh':
+                    // Trigger a full data pull for the equipment
+                    $eqLogic->cronPullData();
+                    break;
+                    
+                case 'testConnection':
+                    // Test connection to the printer
+                    $ipAddress = $eqLogic->getConfiguration('ipAddress');
+                    $protocol = $eqLogic->getConfiguration('protocol', 'http');
+                    
+                    if (empty($ipAddress)) {
+                        log::add('hp_printer', 'error', 'IP address not configured for connection test');
+                        jeedom::message(array('message' => __('L\'adresse IP n\'est pas configurée pour le test de connexion.', __FILE__), 'type' => 'error'));
+                        self::$isExecuting = false;
+                        return;
+                    }
+                    
+                    $url = $protocol . "://" . $ipAddress . "/DevMgmt/ProductConfigDyn.xml";
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL => $url,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 5,
+                        CURLOPT_CONNECTTIMEOUT => 5,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => false,
+                        CURLOPT_FOLLOWLOCATION => false,
+                        CURLOPT_USERAGENT => 'Jeedom HP Printer Test'
+                    ]);
+                    
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curlErrno = curl_errno($ch);
+                    $curlError = curl_error($ch);
+                    curl_close($ch);
+                    
+                    if ($curlErrno || $httpCode !== 200) {
+                        log::add('hp_printer', 'warning', 'Connection test failed for ' . $ipAddress . ' - HTTP: ' . $httpCode . ' - cURL Error: ' . $curlError);
+                        jeedom::message(array('message' => __('La connexion à l\'imprimante a échoué. Vérifiez l\'adresse IP et que l\'imprimante est en ligne.', __FILE__), 'type' => 'error'));
+                    } else {
+                        log::add('hp_printer', 'info', 'Connection test successful for ' . $ipAddress);
+                        jeedom::message(array('message' => __('La connexion à l\'imprimante est réussie.', __FILE__), 'type' => 'success'));
+                    }
+                    break;
 
-            case 'cleanHeads':
-                // Start a cleaning cycle
-                $url = $eqLogic->getConfiguration('protocol', 'http') . "://" . $eqLogic->getConfiguration('ipAddress') . "/DevMgmt/InternalPrintDyn.xml";
-                $xml = '<ipdyn:InternalPrintDyn xmlns:ipdyn="http://www.hp.com/schemas/imaging/con/ledm/internalprintdyn/2008/03/21" xmlns:dd="http://www.hp.com/schemas/imaging/con/dictionaries/1.0/"><ipdyn:Job><ipdyn:JobType>cleaningPage</ipdyn:JobType></ipdyn:Job></ipdyn:InternalPrintDyn>';
-                $ch = curl_init();
-                curl_setopt_array($ch, [
-                    CURLOPT_URL => $url,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => $xml,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/xml'],
-                    CURLOPT_TIMEOUT => 10,
-                    CURLOPT_CONNECTTIMEOUT => 5,
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => false
-                ]);
-                curl_exec($ch);
-                curl_close($ch);
-                break;
-                
-            default:
-                // For other commands, also trigger data pull
-                $eqLogic->cronPullData();
-                break;
+                case 'cleanHeads':
+                    // Start a cleaning cycle
+                    $url = $eqLogic->getConfiguration('protocol', 'http') . "://" . $eqLogic->getConfiguration('ipAddress') . "/DevMgmt/InternalPrintDyn.xml";
+                    $xml = '<ipdyn:InternalPrintDyn xmlns:ipdyn="http://www.hp.com/schemas/imaging/con/ledm/internalprintdyn/2008/03/21" xmlns:dd="http://www.hp.com/schemas/imaging/con/dictionaries/1.0/"><ipdyn:Job><ipdyn:JobType>cleaningPage</ipdyn:JobType></ipdyn:Job></ipdyn:InternalPrintDyn>';
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL => $url,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => $xml,
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/xml'],
+                        CURLOPT_TIMEOUT => 10,
+                        CURLOPT_CONNECTTIMEOUT => 5,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => false
+                    ]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                    break;
+                    
+                default:
+                    // No action for other commands
+                    break;
+            }
+        } finally {
+            self::$isExecuting = false;
         }
     }
 }
