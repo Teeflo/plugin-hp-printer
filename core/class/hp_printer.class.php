@@ -1,7 +1,11 @@
 <?php
 
 /* ***************************Includes********************************* */
+// Vérifie si la classe `eqLogic` n'est pas déjà définie.
+// Si elle ne l'est pas, cela signifie que le fichier `core.inc.php` de Jeedom n'a pas encore été inclus.
 if (!class_exists('eqLogic')) {
+    // Inclut le fichier `core.inc.php` qui contient les classes et fonctions de base de Jeedom.
+    // Le chemin est relatif au répertoire du plugin.
     require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
 }
 
@@ -16,23 +20,37 @@ class hp_printer extends eqLogic {
 
     /**
      * Called after saving the equipment - creates all necessary commands automatically
+     *
+     * Cette méthode est automatiquement appelée par Jeedom après la sauvegarde d'un équipement.
+     * Son rôle est de créer ou de mettre à jour toutes les commandes associées à l'équipement HP Printer
+     * en se basant sur la définition des commandes dans le fichier `commands.json`.
      */
     public function postSave() {
+        // Ajoute une entrée dans les logs de Jeedom pour indiquer le début de la création des commandes.
         log::add('hp_printer', 'info', 'Creating HP printer commands for equipment: ' . $this->getName());
 
+        // Définit le chemin absolu vers le fichier `commands.json`.
         $commandsJsonPath = dirname(__FILE__) . '/../../plugin_info/commands.json';
+        // Vérifie si le fichier `commands.json` existe.
         if (!file_exists($commandsJsonPath)) {
+            // Si le fichier n'est pas trouvé, enregistre une erreur et arrête l'exécution de la méthode.
             log::add('hp_printer', 'error', 'commands.json not found at: ' . $commandsJsonPath);
             return;
         }
 
+        // Lit le contenu du fichier `commands.json` et le décode en tableau associatif PHP.
         $commandsData = json_decode(file_get_contents($commandsJsonPath), true);
+        // Vérifie si le décodage JSON a échoué (par exemple, fichier mal formé).
         if ($commandsData === null) {
+            // Si le décodage échoue, enregistre une erreur et arrête l'exécution.
             log::add('hp_printer', 'error', 'Failed to decode commands.json');
             return;
         }
 
+        // Parcourt chaque définition de commande trouvée dans `commands.json`.
         foreach ($commandsData as $commandDef) {
+            // Appelle la méthode `createCommand` pour créer ou mettre à jour chaque commande.
+            // Les paramètres sont extraits du tableau `$commandDef` avec des valeurs par défaut si non spécifiées.
             $this->createCommand(
                 $commandDef['id'],
                 $commandDef['name'],
@@ -44,85 +62,135 @@ class hp_printer extends eqLogic {
             );
         }
 
+        // Ajoute une entrée dans les logs pour confirmer la création réussie des commandes.
         log::add('hp_printer', 'info', 'HP printer commands created successfully from commands.json');
     }
 
     /**
      * Helper function to create a command
+     *
+     * Cette fonction utilitaire crée ou met à jour une commande spécifique pour l'équipement.
+     * Elle est appelée par `postSave` pour chaque commande définie dans `commands.json`.
+     *
+     * @param string $logicalId L'ID logique de la commande (ex: 'makeAndModel').
+     * @param string $name Le nom affiché de la commande (ex: 'Modèle').
+     * @param string $type Le type de la commande (info ou action).
+     * @param string $subType Le sous-type de la commande (string, numeric, binary, other).
+     * @param string $unit L'unité de la commande (ex: '%', 'pages').
+     * @param bool $visible Indique si la commande doit être visible sur le dashboard.
+     * @param bool $historized Indique si la valeur de la commande doit être historisée.
      */
     private function createCommand($logicalId, $name, $type, $subType, $unit = '', $visible = true, $historized = false) {
+        // Tente de récupérer une commande existante avec le même ID logique pour cet équipement.
         $cmd = $this->getCmd(null, $logicalId);
+        // Si la commande n'existe pas, crée une nouvelle instance de `hp_printerCmd`.
         if (!is_object($cmd)) {
             $cmd = new hp_printerCmd();
+            // Définit l'ID logique de la commande.
             $cmd->setLogicalId($logicalId);
+            // Associe la commande à l'équipement actuel.
             $cmd->setEqLogic_id($this->getId());
+            // Définit le nom de la commande.
             $cmd->setName($name);
         }
         
+        // Définit le type de la commande (info ou action).
         $cmd->setType($type);
+        // Définit le sous-type de la commande (string, numeric, binary, other).
         $cmd->setSubType($subType);
+        // Définit l'unité de la commande.
         $cmd->setUnite($unit);
+        // Définit la visibilité de la commande (1 pour visible, 0 pour caché).
         $cmd->setIsVisible($visible ? 1 : 0);
+        // Définit si la commande doit être historisée (1 pour oui, 0 pour non).
         $cmd->setIsHistorized($historized ? 1 : 0);
         
         // Désactiver le bouton test pour les commandes info car elles ne sont pas exécutables
+        // Les commandes de type 'info' ne doivent pas avoir de bouton de test car elles ne déclenchent pas d'action.
         if ($type === 'info') {
+            // Affiche le nom de la commande sur le widget.
             $cmd->setDisplay('showNameOn', 1);
+            // Affiche le statut de la commande sur le widget.
             $cmd->setDisplay('showStatOn', 1);
-            // Cache le bouton de test pour les commandes info
+            // Cache le bouton de test pour les commandes info en vidant l'action de vérification.
             $cmd->setConfiguration('actionCheckCmd', '');
         }
         
+        // Sauvegarde la commande dans la base de données de Jeedom.
         $cmd->save();
     }
 
     /**
      * Pulls all data from the printer and updates Jeedom commands.
      * This method is intended to be called by a Jeedom cron job.
+     *
+     * Cette méthode est le cœur du plugin. Elle est exécutée périodiquement (via cron)
+     * pour récupérer les dernières informations de l'imprimante HP et mettre à jour
+     * les valeurs des commandes correspondantes dans Jeedom.
      */
     public function cronPullData() {
+        // Enregistre le début de l'opération de récupération des données dans les logs.
         log::add('hp_printer', 'info', 'Starting data pull for eqLogic ID: ' . $this->getId());
 
+        // Récupère l'adresse IP et le protocole (HTTP/HTTPS) configurés pour cet équipement.
         $ipAddress = $this->getConfiguration('ipAddress');
         $protocol = $this->getConfiguration('protocol', 'http');
 
+        // Log les informations de configuration utilisées.
         log::add('hp_printer', 'info', 'Configuration - IP: ' . $ipAddress . ', Protocol: ' . $protocol);
 
+        // Vérifie si l'adresse IP est configurée.
         if (empty($ipAddress)) {
+            // Si l'adresse IP est manquante, enregistre une erreur et arrête l'exécution.
             log::add('hp_printer', 'error', 'IP address not configured for eqLogic ID: ' . $this->getId());
             log::add('hp_printer', 'error', 'Please configure the IP address in the equipment settings');
             return;
         }
 
         try {
+            // Lit le fichier `commands.json` pour obtenir la liste des commandes et leurs sources XML.
             $commandsJsonPath = dirname(__FILE__) . '/../../plugin_info/commands.json';
             $commandsData = json_decode(file_get_contents($commandsJsonPath), true);
 
+            // Initialise un tableau pour regrouper les commandes par source XML (endpoint).
             $endpoints = [];
+            // Parcourt toutes les définitions de commandes.
             foreach ($commandsData as $commandDef) {
+                // Si la commande a une source XML définie, l'ajoute au tableau `$endpoints`.
                 if (isset($commandDef['xml_source'])) {
                     $endpoints[$commandDef['xml_source']][] = $commandDef;
                 }
             }
 
+            // Parcourt chaque endpoint XML unique.
             foreach ($endpoints as $xmlSource => $cmds) {
+                // Construit l'URL complète de l'endpoint XML.
                 $url = $protocol . "://" . $ipAddress . $xmlSource;
+                // Récupère les données XML depuis l'imprimante pour cet endpoint.
                 $xmlData = $this->fetchXMLData($url);
 
+                // Si les données XML ont été récupérées avec succès.
                 if ($xmlData !== false) {
+                    // Parcourt toutes les commandes associées à cet endpoint.
                     foreach ($cmds as $cmdDef) {
+                        // Vérifie si la commande est une commande de consommable (encre, etc.).
                         if (isset($cmdDef['is_consumable']) && $cmdDef['is_consumable'] === true) {
+                            // Met à jour la commande de consommable en utilisant une logique spécifique.
                             $this->updateConsumableCommand($xmlData, $cmdDef);
                         } else {
+                            // Extrait la valeur de la commande à partir des données XML en utilisant le chemin XPath.
                             $value = $this->extractXMLValue($xmlData, $cmdDef['xpath']);
+                            // Met à jour la valeur de la commande dans Jeedom.
                             $this->updateCommandValue($cmdDef['id'], $value);
                         }
                     }
                 }
             }
 
+            // Enregistre la fin de l'opération de récupération des données dans les logs.
             log::add('hp_printer', 'info', 'Data pull completed successfully for eqLogic ID: ' . $this->getId());
         } catch (Exception $e) {
+            // En cas d'erreur pendant la récupération des données, enregistre l'erreur dans les logs.
             log::add('hp_printer', 'error', 'Failed to pull data for eqLogic ID ' . $this->getId() . ': ' . $e->getMessage());
         }
     }

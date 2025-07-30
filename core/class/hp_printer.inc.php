@@ -16,6 +16,11 @@
  * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Ce fichier sert de point d'entrée pour inclure la classe principale du plugin HP Printer.
+// Il assure que la classe `hp_printer` est disponible pour d'autres parties de Jeedom qui pourraient en avoir besoin.
+
+// Inclut le fichier `hp_printer.class.php` qui contient la définition des classes `hp_printer` et `hp_printerCmd`.
+// `dirname(__FILE__)` retourne le chemin du répertoire courant, assurant que le chemin est correct quelle que soit l'emplacement du fichier.
 require_once dirname(__FILE__) . '/hp_printer.class.php';
 
 ?>
